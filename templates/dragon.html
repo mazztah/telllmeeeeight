@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Dragon Jump v2.0 - Street Life Edition</title>
+    <link rel="stylesheet" href="/dragon/static/css/Dragon.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="game-header">
+        <div class="game-title">🐉 <span>Dragon</span> Jump</div>
+        <div class="score-display">
+            <div class="score-box">
+                <label>Score</label>
+                <div class="value" id="score">0</div>
+            </div>
+            <div class="score-box">
+                <label>High Score</label>
+                <div class="value" id="highScore">0</div>
+            </div>
+            <div class="score-box">
+                <label>Level</label>
+                <div class="value" id="level">1</div>
+            </div>
+            <div class="score-box">
+                <label>Coins</label>
+                <div class="value" id="coinCount">0</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Game Container -->
+    <div class="game-container" id="gameContainer">
+        <!-- Sound Toggle -->
+        <div class="sound-toggle" id="soundToggle" title="Sound an/aus">🔊</div>
+
+        <!-- Coin Counter -->
+        <div class="coin-counter" id="coinCounter">
+            <span class="coin-icon">🪙</span>
+            <span id="totalCoinCount">0</span>
+        </div>
+
+        <!-- Level Badge -->
+        <div class="level-badge">Level 1</div>
+
+        <!-- Game Buttons -->
+        <div class="game-buttons">
+            <button class="game-btn pause" id="pauseBtn">⏸ Pause</button>
+            <button class="game-btn stop" id="stopBtn">⏹ Stop</button>
+            <button class="game-btn" id="menuBtn">🛒 Shop</button>
+        </div>
+
+        <!-- Double Jump Indicator -->
+        <div class="double-jump-indicator">
+            <div class="jump-charge active"></div>
+            <div class="jump-charge active"></div>
+        </div>
+
+        <!-- Start Overlay -->
+        <div class="overlay" id="startOverlay">
+            <h2>🐉 Dragon Jump</h2>
+            <p>Hilf dem hellblauen Drachen durch die Stadt! Sammle Coins, kaufe Upgrades und ueberlebe so lange wie moeglich!</p>
+            <div class="username-input">
+                <input type="text" id="usernameInput" placeholder="Dein Username" maxlength="20" autocomplete="off" value="">
+            </div>
+            <button class="btn btn-primary" id="startBtn">▶ Spiel Starten</button>
+            <button class="btn btn-gold" id="menuBtnStart">🛒 Shop</button>
+            <div class="controls-info">
+                <kbd>Space</kbd> <kbd>↑</kbd> oder <kbd>Touch</kbd> zum Springen • 
+                <kbd>↓</kbd> zum Schnell-Fallen • <kbd>Esc</kbd> fuer Pause
+            </div>
+        </div>
+
+        <!-- Pause Overlay -->
+        <div class="overlay pause-overlay hidden" id="pauseOverlay">
+            <h2>⏸ PAUSE</h2>
+            <button class="btn btn-primary" id="resumeBtn">▶ Weiter</button>
+            <button class="btn btn-secondary" id="menuBtnPause">🛒 Shop</button>
+            <button class="btn btn-stop" id="stopBtnPause">⏹ Beenden</button>
+        </div>
+
+        <!-- Shop Overlay -->
+        <div class="overlay shop-overlay hidden" id="shopOverlay">
+            <div class="shop-header">
+                <h2>🛒 Upgrade Shop</h2>
+                <div class="coin-balance">
+                    <span>🪙</span>
+                    <span id="shopCoinBalance">0</span>
+                </div>
+            </div>
+            <div class="shop-items" id="shopItems"></div>
+            <button class="btn btn-primary" id="shopCloseBtn" style="margin-top:20px;">✅ Zurueck</button>
+        </div>
+
+        <!-- Game Over Overlay -->
+        <div class="overlay hidden" id="gameOverOverlay">
+            <h2>💀 Game Over</h2>
+            <div class="game-over-stats">
+                <div class="stat-box">
+                    <div class="stat-label">Score</div>
+                    <div class="stat-value" id="finalScore">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Level</div>
+                    <div class="stat-value" id="finalLevel">1</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Coins</div>
+                    <div class="stat-value" id="finalCoins">0</div>
+                </div>
+            </div>
+            <div class="username-input">
+                <input type="text" id="usernameInputGameOver" placeholder="Dein Username" maxlength="20" autocomplete="off">
+            </div>
+            <button class="btn btn-primary" id="restartBtn">🔄 Nochmal Spielen</button>
+            <button class="btn btn-gold" id="menuBtnGameOver">🛒 Shop</button>
+            <div class="controls-info">
+                <kbd>Space</kbd> oder <kbd>Touch</kbd> zum Neustarten
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div class="mobile-controls">
+        <div class="mobile-btn" id="jumpBtn">⬆️</div>
+        <div class="mobile-btn" id="duckBtn">⬇️</div>
+    </div>
+
+    <!-- Leaderboard -->
+    <section class="leaderboard-section">
+        <h3>🏆 Bestenliste</h3>
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>Rang</th>
+                    <th>Spieler</th>
+                    <th>Punkte</th>
+                    <th>Level</th>
+                    <th>Coins</th>
+                    <th>Datum</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+                <tr>
+                    <td colspan="6" style="text-align: center; color: rgba(255,255,255,0.4); padding: 20px;">
+                        Noch keine Eintraege. Sei der Erste! 🐉
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <script src="/dragon/static/js/Dragon.js"></script>
+    <script>
+        // Sync username across all inputs
+        const inputs = [
+            document.getElementById('usernameInput'),
+            document.getElementById('usernameInputGameOver')
+        ];
+
+        inputs.forEach(input => {
+            if (!input) return;
+            input.addEventListener('input', (e) => {
+                const val = e.target.value;
+                inputs.forEach(i => { if (i && i !== e.target) i.value = val; });
+                localStorage.setItem('dragonUsername', val);
+            });
+        });
+
+        // Load saved username
+        const savedName = localStorage.getItem('dragonUsername');
+        if (savedName) {
+            inputs.forEach(i => { if (i) i.value = savedName; });
+        }
+
+        // Shop buttons from different overlays
+        document.getElementById('menuBtnStart').addEventListener('click', () => {
+            if (window.dragonGame) window.dragonGame.openShop();
+        });
+        document.getElementById('menuBtnPause').addEventListener('click', () => {
+            if (window.dragonGame) window.dragonGame.openShop();
+        });
+        document.getElementById('menuBtnGameOver').addEventListener('click', () => {
+            if (window.dragonGame) {
+                window.dragonGame.gameOverOverlay.classList.add('hidden');
+                window.dragonGame.openShop();
+            }
+        });
+        document.getElementById('stopBtnPause').addEventListener('click', () => {
+            if (window.dragonGame) window.dragonGame.stopGame();
+        });
+    </script>
+</body>
+</html>

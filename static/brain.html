@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Brain • Telllmeeedrei</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    body { background: #0d0014; color: #f0d6ff; font-family: 'Syne', sans-serif; }
+    .mono { font-family: 'Space Mono', monospace; }
+    .card { 
+      background: #1e002e; 
+      border: 1px solid #3d005a; 
+      transition: all 0.3s ease;
+    }
+    .card:hover { 
+      border-color: #cc44ff; 
+      box-shadow: 0 0 30px rgba(204,68,255,0.3); 
+    }
+  </style>
+</head>
+<body class="min-h-screen p-6">
+  <div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-10">
+      <div class="flex items-center gap-4">
+        <div class="text-5xl">🧠</div>
+        <div>
+          <h1 class="text-4xl font-bold tracking-tighter">BRAIN</h1>
+          <p class="mono text-sm tracking-widest text-purple-400">CORPORATE KNOWLEDGE OS</p>
+        </div>
+      </div>
+      <button onclick="loadEntries()" 
+              class="px-6 py-3 bg-zinc-900 hover:bg-zinc-800 border border-purple-500 rounded-2xl flex items-center gap-2">
+        <i class="fa-solid fa-arrows-rotate"></i> Aktualisieren
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      
+      <!-- Einträge -->
+      <div class="lg:col-span-5">
+        <h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
+          📁 Deine Einträge
+        </h2>
+        <div id="entries-list" class="space-y-4 max-h-[72vh] overflow-y-auto pr-3"></div>
+      </div>
+
+      <!-- AI Workspace -->
+      <div class="lg:col-span-7">
+        <div class="card rounded-3xl p-6 h-full flex flex-col min-h-[72vh]">
+          <h2 class="text-2xl font-semibold mb-6 flex items-center gap-3">
+            <i class="fa-solid fa-robot text-cyan-400"></i>
+            Brain Agent
+          </h2>
+          
+          <div id="chat-container" class="flex-1 overflow-y-auto space-y-5 mb-6 pr-2"></div>
+          
+          <div class="flex gap-3">
+            <input id="user-input" type="text" 
+                   class="flex-1 bg-zinc-900 border border-purple-500/40 rounded-2xl px-6 py-5 focus:border-purple-500 outline-none"
+                   placeholder="Stelle eine Frage zu deinem gesamten Brain...">
+            <button onclick="sendQuery()" 
+                    class="bg-gradient-to-r from-purple-600 to-pink-600 px-8 rounded-2xl font-bold hover:brightness-110 transition">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function resolveChatId() {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = (params.get("chat_id") || "").trim();
+      const fromStorage = (localStorage.getItem("brain_chat_id") || "").trim();
+      const chatId = fromUrl || fromStorage || "";
+      if (fromUrl) {
+        localStorage.setItem("brain_chat_id", fromUrl);
+      }
+      return chatId || null;
+    }
+
+    // ==================== ENTRIES ====================
+    async function loadEntries() {
+      const container = document.getElementById("entries-list");
+      container.innerHTML = `<p class="text-purple-400">Lade Einträge...</p>`;
+
+      try {
+        const chatId = resolveChatId();
+        const url = chatId
+          ? `/api/brain/entries?chat_id=${encodeURIComponent(chatId)}`
+          : "/api/brain/entries";
+        const res = await fetch(url);
+        const entries = await res.json();
+
+        container.innerHTML = "";
+        if (entries.length === 0) {
+          container.innerHTML = `<p class="text-zinc-400">Noch keine Einträge im Brain.</p>`;
+          return;
+        }
+
+        entries.forEach(entry => {
+          const div = document.createElement("div");
+          div.className = "card rounded-3xl p-6 cursor-pointer hover:scale-[1.02] transition-all";
+
+          const isFile = entry.entry_type === "file";
+          const downloadBtn = isFile ? `
+            <button onclick="downloadFile('${entry.id}', '${(entry.title || 'Datei').replace(/'/g, "\\'")}')" 
+                    class="mt-4 w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:brightness-110 text-white py-3 rounded-2xl flex items-center justify-center gap-2 font-medium">
+              <i class="fa-solid fa-download"></i> Download
+            </button>
+          ` : '';
+
+          div.innerHTML = `
+            <div class="flex justify-between items-start gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="font-medium text-lg truncate">${entry.title || "Ohne Titel"}</div>
+                <div class="text-xs mono text-purple-400 mt-1">
+                  ${entry.entry_type?.toUpperCase() || 'UNBEKANNT'} • ${new Date(entry.created_at).toLocaleDateString('de-DE')}
+                </div>
+              </div>
+              ${isFile ? `<i class="fa-solid fa-file text-3xl text-purple-400 opacity-70"></i>` : ''}
+            </div>
+            ${downloadBtn}
+          `;
+
+          // Klick auf Karte (außer Button) → Details
+          div.addEventListener('click', (e) => {
+            if (!e.target.closest('button')) {
+              showEntryDetails(entry.id);
+            }
+          });
+
+          container.appendChild(div);
+        });
+      } catch (e) {
+        console.error(e);
+        container.innerHTML = `<p class="text-red-400">Fehler beim Laden der Einträge.</p>`;
+      }
+    }
+
+    // ==================== DOWNLOAD ====================
+    async function downloadFile(entryId, filename) {
+      try {
+        const chatId = resolveChatId();
+        const url = chatId
+          ? `/api/brain/download/${entryId}?chat_id=${encodeURIComponent(chatId)}`
+          : `/api/brain/download/${entryId}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Nicht gefunden");
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+      } catch (e) {
+        console.error(e);
+        alert("❌ Download fehlgeschlagen. Die Datei konnte nicht gefunden werden.");
+      }
+    }
+
+    // ==================== DETAILS (zukünftig erweiterbar) ====================
+    function showEntryDetails(entryId) {
+      alert(`📄 Eintrag ${entryId} angeklickt.\n\nDetails & Vorschau kommen bald...`);
+    }
+
+    // ==================== CHAT ====================
+    function addMessage(sender, text) {
+      const container = document.getElementById("chat-container");
+      const div = document.createElement("div");
+      div.className = sender === "user" ? "flex justify-end" : "flex justify-start";
+      
+      div.innerHTML = `
+        <div class="${sender === "user" ? 
+          'bg-purple-600 text-white' : 
+          'bg-zinc-800 border border-purple-500/30'} max-w-[85%] rounded-3xl px-6 py-4">
+          ${text}
+        </div>`;
+      
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+      return div;
+    }
+
+    async function sendQuery() {
+      const input = document.getElementById("user-input");
+      const query = input.value.trim();
+      if (!query) return;
+
+      addMessage("user", query);
+      input.value = "";
+
+      const loadingDiv = addMessage("ai", "🤔 Denke nach und suche im Brain...");
+
+      try {
+        const chatId = resolveChatId();
+        const payload = { query: query };
+        if (chatId) {
+          payload.chat_id = chatId;
+        }
+
+        const res = await fetch("/api/brain/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        
+        if (loadingDiv && loadingDiv.parentNode) loadingDiv.remove();
+        addMessage("ai", data.answer || "Keine passende Antwort gefunden.");
+        
+      } catch (e) {
+        console.error(e);
+        if (loadingDiv && loadingDiv.parentNode) loadingDiv.remove();
+        addMessage("ai", "❌ Verbindungsfehler zum Brain Agent.");
+      }
+    }
+
+    // ==================== INIT ====================
+    window.onload = () => {
+      loadEntries();
+      addMessage("ai", "Hallo! Ich bin dein Brain Agent.<br>Ich kann alle deine gespeicherten Dateien, Chats und Notizen analysieren.");
+    };
+  </script>
+</body>
+</html>

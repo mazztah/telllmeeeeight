@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Queen's Code Sandbox V8</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.0/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.0/mode-python.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.0/mode-html.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.0/theme-monokai.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/sandbox/static/css/sandbox.css">
+</head>
+<body>
+    <div id="app">
+        <!-- HEADER -->
+        <div id="header">
+            <h1><span>👑</span> Code Sandbox <span style="font-size:0.7rem;color:var(--muted);font-weight:400;">V8</span></h1>
+            <div class="header-btns">
+                <button class="btn btn-secondary btn-sm" id="btn-examples" title="Beispiele">📚</button>
+                <button class="btn btn-secondary btn-sm" id="btn-clear" title="Editor leeren">🗑️</button>
+                <button class="btn btn-secondary btn-sm" id="btn-copy" title="Code kopieren">📋</button>
+                <button class="btn btn-run" id="btn-run">
+                    <span>▶</span> <span id="run-text">Run</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- TOOLBAR -->
+        <div id="toolbar">
+            <div class="toolbar-group">
+                <select id="lang-select">
+                    <option value="python">🐍 Python</option>
+                    <option value="html">🌐 HTML</option>
+                </select>
+            </div>
+            <div class="toolbar-sep"></div>
+            <div class="toolbar-group toolbar-templates">
+                <button class="btn btn-secondary btn-sm btn-tpl" data-tpl="hello" title="Hallo Welt">👋</button>
+                <button class="btn btn-secondary btn-sm btn-tpl" data-tpl="plot" title="Matplotlib Plot">📊</button>
+                <button class="btn btn-secondary btn-sm btn-tpl" data-tpl="dataframe" title="Pandas DataFrame">📋</button>
+                <button class="btn btn-secondary btn-sm btn-tpl" data-tpl="chart" title="Balken-Chart">📈</button>
+                <button class="btn btn-secondary btn-sm btn-tpl" data-tpl="mini_app" title="Mini-App">🎨</button>
+            </div>
+            <div class="toolbar-sep"></div>
+            <div class="toolbar-group">
+                <button class="btn btn-secondary btn-sm" id="btn-download" title="Code herunterladen">⬇️</button>
+                <button class="btn btn-secondary btn-sm" id="btn-save" title="Im Brain speichern">💾</button>
+                <button class="btn btn-gold btn-sm" id="btn-share" title="An Telegram senden">📤</button>
+                <button class="btn btn-secondary btn-sm" id="btn-equalize" title="Bereiche gleichmäßig">⚖️</button>
+            </div>
+        </div>
+
+        <!-- MAIN WORKSPACE: Editor + Output + Chat (alle dynamisch) -->
+        <div id="workspace">
+
+            <!-- EDITOR SECTION -->
+            <div id="editor-section" class="workspace-section mobile-panel" data-min="60" data-panel="editor">
+                <div id="editor-container"></div>
+            </div>
+
+            <!-- RESIZE HANDLE 1 -->
+            <div class="resize-handle" id="resize-handle-1" title="Editor/Output anpassen">⋯</div>
+
+            <!-- OUTPUT SECTION (Terminal Panel) -->
+            <div id="output-section" class="workspace-section mobile-panel mobile-terminal-view" data-min="38" data-panel="terminal">
+                <div id="collapse-bar">
+                    <span class="collapse-icon" id="collapse-icon">▼</span>
+                    <span id="collapse-text">Output</span>
+                    <div id="output-tabs">
+                        <button class="output-tab active" data-pane="terminal">🖥️ Terminal</button>
+                        <button class="output-tab" data-pane="plot">📊 Plot</button>
+                        <button class="output-tab" data-pane="file">📁 Datei</button>
+                        <button class="output-tab" data-pane="html-preview">🌐 HTML</button>
+                        <button class="output-tab" data-pane="parser">🔍 Parser</button>
+                    </div>
+                </div>
+                <div class="output-inner">
+                    <div id="terminal-pane" class="output-pane active">
+                        <div id="terminal"></div>
+                    </div>
+                    <div id="plot-pane" class="output-pane"></div>
+                    <div id="file-pane" class="output-pane">
+                        <div class="upload-area" id="upload-area">
+                            <input type="file" id="file-input" accept=".py,.txt,.csv,.json,.html,.js,.css,.md" style="display:none">
+                            <div class="upload-icon">📁</div>
+                            <div class="upload-title">Datei hochladen</div>
+                            <div class="upload-sub">Tippen zum Auswählen – oder per Drag & Drop</div>
+                        </div>
+                        <div id="upload-permissions">
+                            <div class="perm-title">🔐 Berechtigungen</div>
+                            <div id="perm-list">
+                                <div class="perm-item" data-perm="file">
+                                    <span class="perm-icon">📄</span>
+                                    <span class="perm-label">Dateizugriff</span>
+                                    <span class="perm-status" id="perm-file">⏳</span>
+                                </div>
+                                <div class="perm-item" data-perm="clipboard">
+                                    <span class="perm-icon">📋</span>
+                                    <span class="perm-label">Zwischenablage</span>
+                                    <span class="perm-status" id="perm-clipboard">⏳</span>
+                                </div>
+                                <div class="perm-item" data-perm="notifications">
+                                    <span class="perm-icon">🔔</span>
+                                    <span class="perm-label">Benachrichtigungen</span>
+                                    <span class="perm-status" id="perm-notifications">⏳</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" id="btn-request-perms" style="margin-top:8px; width:100%;">🔐 Berechtigungen prüfen & anfordern</button>
+                        </div>
+                    </div>
+                    <div id="html-preview-pane" class="output-pane">
+                        <div id="html-preview-toolbar">
+                            <button class="btn btn-secondary btn-sm" id="btn-refresh-html">🔄 Aktualisieren</button>
+                            <button class="btn btn-secondary btn-sm" id="btn-open-html">🔍 Groß anzeigen</button>
+                            <span id="html-preview-status" style="margin-left:auto; font-size:0.75rem; color:var(--muted);">Bereit</span>
+                        </div>
+                        <iframe id="html-preview-frame" sandbox="allow-scripts allow-same-origin allow-popups" style="width:100%; height:calc(100% - 40px); border:none; background:#fff; border-radius:0 0 8px 8px;"></iframe>
+                    </div>
+                    <div id="parser-pane" class="output-pane">
+                        <div id="parser-toolbar" style="display:flex; gap:8px; padding:8px; background:var(--surface2); border-bottom:1px solid var(--border);">
+                            <button class="btn btn-secondary btn-sm" id="btn-refresh-parser">🔄 Analysieren</button>
+                            <span id="parser-status" style="margin-left:auto; font-size:0.75rem; color:var(--muted);">Klicke 🔄 für Analyse</span>
+                        </div>
+                        <div id="parser-content"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RESIZE HANDLE 2 -->
+            <div class="resize-handle" id="resize-handle-2" title="Output/Chat anpassen">⋯</div>
+
+            <!-- CHAT SECTION -->
+            <div id="chat-section" class="workspace-section mobile-panel" data-min="36" data-panel="chat">
+                <div id="chat-header">
+                    <button id="chat-toggle" class="chat-toggle-btn">
+                        <span id="chat-toggle-icon">💬</span>
+                        <span>🤖 KI-Assistent</span>
+                        <span id="chat-toggle-arrow">▲</span>
+                    </button>
+                </div>
+                <div id="chat-body">
+                    <div id="chat-messages">
+                        <div class="chat-msg assistant">
+                            <div class="chat-avatar">🤖</div>
+                            <div class="chat-bubble">
+                                Hallo! Ich bin dein Code-Assistent. Ich kann deinen Code erklären, verbessern und dir beim Programmieren helfen. Frag mich einfach! 👑
+                            </div>
+                        </div>
+                    </div>
+                    <div id="chat-input-row">
+                        <textarea id="chat-input" placeholder="Code erklären, Fehler finden, Ideen..." rows="1"></textarea>
+                        <button id="chat-send" title="Senden">
+                            <span id="chat-send-icon">➤</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /workspace -->
+
+        <!-- MOBILE NAV DOTS (nur sichtbar auf kleinen Screens) -->
+        <div id="mobile-nav">
+            <div class="nav-dot active" data-panel="0" title="Code Editor"></div>
+            <span class="nav-label">Code</span>
+            <div class="nav-dot" data-panel="1" title="Terminal"></div>
+            <span class="nav-label">Terminal</span>
+            <div class="nav-dot" data-panel="2" title="KI-Chat"></div>
+            <span class="nav-label">KI-Chat</span>
+        </div>
+
+        <!-- STATUS BAR -->
+        <div id="status-bar">
+            <div class="status-item">
+                <div class="status-dot" id="status-dot"></div>
+                <span id="status-text">Bereit</span>
+            </div>
+            <span id="cursor-pos">Ln 1, Col 1</span>
+            <span id="exec-time"></span>
+        </div>
+
+    </div><!-- /app -->
+
+    <!-- EXAMPLES MODAL -->
+    <div id="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>📚 Code-Beispiele</h2>
+                <button class="modal-close" id="modal-close">✕</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast"></div>
+
+    <script src="/sandbox/static/js/sandbox.js"></script>
+</body>
+</html>

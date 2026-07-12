@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SoundCloud Player</title>
+</head>
+<body style="font-family: Arial; padding: 20px;">
+  <h2>SoundCloud Link hier rein:</h2>
+  <input id="url" placeholder="https://soundcloud.com/..." style="width:90%; padding:12px; font-size:16px;">
+  <br><br>
+  <button onclick="play()" style="padding:12px 25px; font-size:16px;">▶ Abspielen</button>
+
+  <div id="player" style="margin-top:30px;"></div>
+
+  <script>
+    function play() {
+      const url = document.getElementById('url').value;
+      if (!url) {
+        alert("Bitte SoundCloud-Link einfügen!");
+        return;
+      }
+      document.getElementById('player').innerHTML = 
+        `<iframe width="100%" height="180" scrolling="no" 
+         src="https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500&auto_play=true&visual=true">
+         </iframe>`;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗡️ Queens Aura - 3D Tower Defense</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.167.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.167.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: linear-gradient(135deg, #0f0f23 0%, #1a0033 50%, #330066 100%);
+            overflow: hidden; font-family: 'Courier New', monospace; color: #fff;
+            image-rendering: pixelated;
+        }
+        #gameCanvas { display: block; }
+        #ui {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 100;
+        }
+        #score { position: absolute; top: 20px; left: 20px; font-size: 24px; font-weight: bold; text-shadow: 0 0 10px #00ff88; }
+        #wave { position: absolute; top: 20px; right: 20px; font-size: 20px; text-shadow: 0 0 10px #ff4488; }
+        #health { position: absolute; bottom: 20px; left: 20px; font-size: 18px; }
+        #towerMenu {
+            position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.8);
+            padding: 15px; border-radius: 10px; backdrop-filter: blur(10px);
+            pointer-events: auto; border: 2px solid #00ff88;
+        }
+        .tower-btn {
+            display: block; margin: 8px 0; padding: 10px 15px; background: #333;
+            color: #fff; border: none; border-radius: 5px; cursor: pointer;
+            font-family: inherit; font-size: 14px; transition: all 0.2s;
+        }
+        .tower-btn:hover { background: #00ff88; color: #000; }
+        .tower-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        #waveInfo { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); 
+            background: rgba(0,0,0,0.9); padding: 30px; border-radius: 15px; font-size: 28px;
+            text-align: center; display: none; border: 3px solid #ff4488; }
+        #gameOver { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            background: linear-gradient(45deg, #ff0000, #cc0000); padding: 40px;
+            border-radius: 20px; font-size: 32px; text-align: center; display: none;
+            box-shadow: 0 0 50px #ff0000; border: 4px solid #ff4488;
+        }
+        .neon { text-shadow: 0 0 10px currentColor; animation: neon 2s infinite; }
+        @keyframes neon { 0%,100%{opacity:1;} 50%{opacity:0.7;} }
+        button:focus { outline: none; }
+        @media (max-width: 768px) { #towerMenu { bottom: 10px; right: 10px; padding: 10px; } }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <div id="score" class="neon" style="color: #00ff88;">Score: 0</div>
+        <div id="wave" class="neon" style="color: #ff4488;">Wave 1</div>
+        <div id="health">❤️ Health: 100</div>
+        
+        <div id="towerMenu">
+            <div>🏰 Towers (Cost)</div>
+            <button class="tower-btn" data-type="basic" data-cost="50">Basic (50)</button>
+            <button class="tower-btn" data-type="ice" data-cost="80">Ice (80) ❄️</button>
+            <button class="tower-btn" data-type="fire" data-cost="120">Fire (120) 🔥</button>
+            <button class="tower-btn" data-type="aura" data-cost="200">Queen Aura (200) 👑</button>
+        </div>
+        
+        <div id="waveInfo">
+            <div style="font-size: 36px; margin-bottom: 20px;">Wave Incoming!</div>
+            <div id="waveTimer"></div>
+        </div>
+        
+        <div id="gameOver">
+            <div style="font-size: 48px; margin-bottom: 20px;">Game Over!</div>
+            <div id="finalScore" style="font-size: 24px;"></div>
+            <button onclick="location.reload()" style="margin-top: 30px; padding: 15px 30px; font-size: 20px; background: #00ff88; color: black;">Play Again 👑</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        class QueensAuraGame {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.Fog(0x0f0f23, 10, 100);
+                
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.2;
+                
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+                
+                this.camera.position.set(0, 15, 25);
+                this.controls.target.set(0, 0, 0);
+                this.controls.update();
+                
+                // Game state
+                this.score = 0;
+                this.wave = 1;
+                this.health = 100;
+                this.money = 200;
+                this.towers = [];
+                this.enemies = [];
+                this.projectiles = [];
+                this.selectedTowerType = null;
+                this.waveActive = false;
+                this.waveTimer = 0;
+                this.gameOver = false;
+                
+                // Path for enemies (curved path)
+                this.path = [
+                    new THREE.Vector3(-25, 0, -15),
+                    new THREE.Vector3(-10, 0, -10),
+                    new THREE.Vector3(0, 0, 0),
+                    new THREE.Vector3(10, 0, 10),
+                    new THREE.Vector3(25, 0, 15)
+                ];
+                
+                this.initLighting();
+                this.initGround();
+                this.setupTowers();
+                this.setupUI();
+                this.animate();
+            }
+            
+            initLighting() {
+                const ambient = new THREE.AmbientLight(0x404040, 0.4);
+                this.scene.add(ambient);
+                
+                const directional = new THREE.DirectionalLight(0xffffff, 1);
+                directional.position.set(10, 20, 5);
+                directional.castShadow = true;
+                directional.shadow.mapSize.width = 2048;
+                directional.shadow.mapSize.height = 2048;
+                directional.shadow.camera.near = 0.5;
+                directional.shadow.camera.far = 100;
+                directional.shadow.camera.left = -30;
+                directional.shadow.camera.right = 30;
+                directional.shadow.camera.top = 30;
+                directional.shadow.camera.bottom = -30;
+                this.scene.add(directional);
+                
+                // Aura glow
+                const auraLight = new THREE.PointLight(0x8844ff, 1, 50);
+                auraLight.position.set(0, 5, 0);
+                this.scene.add(auraLight);
+            }
+            
+            initGround() {
+                const geometry = new THREE.PlaneGeometry(60, 40);
+                const material = new THREE.MeshLambertMaterial({ 
+                    color: 0x1a1a2e, 
+                    transparent: true, 
+                    opacity: 0.8 
+                });
+                const ground = new THREE.Mesh(geometry, material);
+                ground.rotation.x = -Math.PI / 2;
+                ground.receiveShadow = true;
+                this.scene.add(ground);
+                
+                // Path visualization
+                const pathGeometry = new THREE.BufferGeometry().setFromPoints(this.path.map(p => new THREE.Vector3(p.x, 0.1, p.z)));
+                const pathMaterial = new THREE.LineBasicMaterial({ color: 0x00ff88, linewidth: 4 });
+                const pathLine = new THREE.Line(pathGeometry, pathMaterial);
+                this.scene.add(pathLine);
+            }
+            
+            setupTowers() {
+                const towerPositions = [
+                    new THREE.Vector3(-20, 0, -10),
+                    new THREE.Vector3(-15, 0, 5),
+                    new THREE.Vector3(0, 0, -12),
+                    new THREE.Vector3(15, 0, 0),
+                    new THREE.Vector3(20, 0, 8)
+                ];
+                
+                towerPositions.forEach((pos, index) => {
+                    const geometry = new THREE.CylinderGeometry(1.5, 1.5, 4, 8);
+                    const material = new THREE.MeshPhongMaterial({ 
+                        color: 0x666666, 
+                        transparent: true, 
+                        opacity: 0.9 
+                    });
+                    const tower = new THREE.Mesh(geometry, material);
+                    tower.position.copy(pos);
+                    tower.position.y = 2;
+                    tower.userData = { available: true, index };
+                    tower.castShadow = true;
+                    tower.receiveShadow = true;
+                    this.scene.add(tower);
+                });
+            }
+            
+            setupUI() {
+                this.updateUI();
+                
+                // Tower buttons
+                document.querySelectorAll('.tower-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const type = btn.dataset.type;
+                        this.selectedTowerType = this.selectedTowerType === type ? null : type;
+                        document.querySelectorAll('.tower-btn').forEach(b => b.style.background = '#333');
+                        if (type === this.selectedTowerType) btn.style.background = '#00ff88';
+                    });
+                });
+                
+                // Click to place tower
+                this.renderer.domElement.addEventListener('click', (event) => {
+                    if (!this.selectedTowerType || this.gameOver) return;
+                    
+                    const rect = this.renderer.domElement.getBoundingClientRect();
+                    const mouse = new THREE.Vector2(
+                        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                        -((event.clientY - rect.top) / rect.height) * 2 + 1
+                    );
+                    
+                    const raycaster = new THREE.Raycaster();
+                    raycaster.setFromCamera(mouse, this.camera);
+                    const intersects = raycaster.intersectObjects(this.scene.children.filter(obj => obj.geometry));
+                    
+                    if (intersects.length > 0) {
+                        const point = intersects[0].point;
+                        point.y = 2;
+                        this.placeTower(point, this.selectedTowerType);
+                    }
+                });
+            }
+            
+            placeTower(position, type) {
+                const cost = { basic: 50, ice: 80, fire: 120, aura: 200 }[type];
+                if (this.money < cost) return;
+                
+                this.money -= cost;
+                this.updateUI();
+                
+                const geometry = new THREE.CylinderGeometry(1, 2, 6, 8);
+                const colors = { basic: 0x888888, ice: 0x44aaff, fire: 0xff4444, aura: 0x8844ff };
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: colors[type], 
+                    emissive: new THREE.Color(colors[type]).multiplyScalar(0.2) 
+                });
+                const tower = new THREE.Mesh(geometry, material);
+                tower.position.copy(position);
+                tower.castShadow = true;
+                tower.receiveShadow = true;
+                tower.userData = { 
+                    type, 
+                    range: type === 'aura' ? 15 : 10, 
+                    damage: type === 'aura' ? 25 : type === 'fire' ? 20 : 15,
+                    fireRate: type === 'ice' ? 1.5 : 1,
+                    lastShot: 0,
+                    slowEffect: type === 'ice'
+                };
+                this.towers.push(tower);
+                this.scene.add(tower);
+            }
+            
+            spawnWave() {
+                this.waveActive = true;
+                this.waveTimer = 300; // 5 seconds prep
+                document.getElementById('waveInfo').style.display = 'block';
+            }
+            
+            updateWave() {
+                if (!this.waveActive) return;
+                
+                this.waveTimer--;
+                document.getElementById('waveTimer').textContent = `Starts in ${Math.ceil(this.waveTimer/60)}s`;
+                
+                if (this.waveTimer <= 0) {
+                    document.getElementById('waveInfo').style.display = 'none';
+                    this.spawnEnemies();
+                    this.waveActive = false;
+                }
+            }
+            
+            spawnEnemies() {
+                const enemyCount = Math.min(3 + this.wave * 2, 15); // Fewer at start
+                for (let i = 0; i < enemyCount; i++) {
+                    setTimeout(() => {
+                        this.createEnemy();
+                    }, i * 500);
+                }
+            }
+            
+            createEnemy() {
+                const geometry = new THREE.SphereGeometry(0.8, 8, 6);
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: new THREE.Color().setHSL(this.wave * 0.1, 0.8, 0.4)
+                });
+                const enemy = new THREE.Mesh(geometry, material);
+                enemy.position.copy(this.path[0]);
+                enemy.userData = {
+                    health: 50 + this.wave * 10,
+                    speed: 0.02 + this.wave * 0.005, // Clever scaling
+                    pathIndex: 0,
+                    lastHit: 0
+                };
+                enemy.castShadow = true;
+                this.enemies.push(enemy);
+                this.scene.add(enemy);
+            }
+            
+            updateEnemies(delta) {
+                this.enemies = this.enemies.filter(enemy => {
+                    if (enemy.userData.pathIndex < this.path.length - 1) {
+                        const target = this.path[enemy.userData.pathIndex + 1];
+                        const dir = new THREE.Vector3().subVectors(target, enemy.position).normalize();
+                        enemy.position.add(dir.multiplyScalar(enemy.userData.speed));
+                        
+                        if (enemy.position.distanceTo(target) < 1) {
+                            enemy.userData.pathIndex++;
+                        }
+                        
+                        // Tower shooting
+                        this.towers.forEach(tower => {
+                            const distance = enemy.position.distanceTo(tower.position);
+                            if (distance < tower.userData.range && 
+                                Date.now() - tower.userData.lastShot > tower.userData.fireRate * 1000) {
+                                
+                                this.shootTower(tower, enemy);
+                            }
+                        });
+                        
+                        return true;
+                    } else {
+                        // Reached end
+                        this.health -= 10;
+                        this.updateUI();
+                        if (this.health <= 0) {
+                            this.gameOver = true;
+                            document.getElementById('finalScore').textContent = `Final Score: ${this.score}`;
+                            document.getElementById('gameOver').style.display = 'block';
+                        }
+                        this.scene.remove(enemy);
+                        return false;
+                    }
+                });
+            }
+            
+            shootTower(tower, enemy) {
+                tower.userData.lastShot = Date.now();
+                
+                // Projectile
+                const projectileGeometry = new THREE.SphereGeometry(0.2);
+                const projectileMaterial = new THREE.MeshBasicMaterial({ 
+                    color: tower.userData.type === 'ice' ? 0x44aaff : 
+                          tower.userData.type === 'fire' ? 0xff4444 : 0x00ff88 
+                });
+                const projectile = new THREE.Mesh(projectileGeometry, projectileMaterial);
+                projectile.position.copy(tower.position);
+                projectile.position.y += 3;
+                projectile.userData = {
+                    target: enemy,
+                    speed: 0.3,
+                    damage: tower.userData.damage,
+                    slowAmount: tower.userData.slowEffect ? 0.5 : 0
+                };
+                this.projectiles.push(projectile);
+                this.scene.add(projectile);
+            }
+            
+            updateProjectiles(delta) {
+                this.projectiles = this.projectiles.filter(projectile => {
+                    if (projectile.userData.target && 
+                        projectile.position.distanceTo(projectile.userData.target.position) > 0.5) {
+                        
+                        const dir = new THREE.Vector3().subVectors(
+                            projectile.userData.target.position, 
+                            projectile.position
+                        ).normalize();
+                        projectile.position.add(dir.multiplyScalar(projectile.userData.speed));
+                        
+                        return true;
+                    } else {
+                        if (projectile.userData.target) {
+                            // Hit
+                            const target = projectile.userData.target;
+                            target.userData.health -= projectile.userData.damage;
+                            target.material.color.setHex(0xff4444);
+                            
+                            if (projectile.userData.slowAmount > 0) {
+                                target.userData.speed *= (1 - projectile.userData.slowAmount);
+                            }
+                            
+                            setTimeout(() => {
+                                target.material.color.setHSL(target.material.color.getHSL().h, 0.8, 0.4);
+                            }, 100);
+                            
+                            this.score += 10;
+                            this.money += 15;
+                            this.updateUI();
+                        }
+                        
+                        this.scene.remove(projectile);
+                        return false;
+                    }
+                });
+            }
+            
+            nextWave() {
+                this.wave++;
+                setTimeout(() => this.spawnWave(), 5000);
+            }
+            
+            updateUI() {
+                document.getElementById('score').textContent = `Score: ${this.score}`;
+                document.getElementById('wave').textContent = `Wave ${this.wave}`;
+                document.getElementById('health').innerHTML = `❤️ Health: ${this.health}`;
+                
+                // Update tower buttons
+                document.querySelectorAll('.tower-btn').forEach(btn => {
+                    const cost = parseInt(btn.dataset.cost);
+                    btn.disabled = this.money < cost;
+                });
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                const delta = 0.016; // ~60fps
+                
+                // Aura pulse
+                const auraLight = this.scene.getObjectByName('auraLight');
+                if (auraLight) {
+                    auraLight.intensity = 1 + Math.sin(Date.now() * 0.005) * 0.3;
+                }
+                
+                // Game logic
+                if (!this.gameOver) {
+                    this.updateEnemies(delta);
+                    this.updateProjectiles(delta);
+                    this.updateWave();
+                    this.updateUI();
+                    
+                    // Check for wave complete
+                    if (this.enemies.length === 0 && !this.waveActive) {
+                        setTimeout(() => {
+                            this.nextWave();
+                        }, 3000);
+                    }
+                }
+                
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+        
+        // Start game
+        window.addEventListener('load', () => {
+            new QueensAuraGame();
+        });
+        
+        // Resize handler
+        window.addEventListener('resize', () => {
+            const game = window.gameInstance;
+            if (game) {
+                game.camera.aspect = window.innerWidth / window.innerHeight;
+                game.camera.updateProjectionMatrix();
+                game.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+    </script>
+</body>
+</html>

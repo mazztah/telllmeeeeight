@@ -1,0 +1,182 @@
+# handler_registry.py – Zentrales Handler-Register
+# Alle application.add_handler()-Aufrufe an einem Ort.
+# Aufruf: register_all_handlers(application)
+import logging
+
+from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, filters
+
+logger = logging.getLogger(__name__)
+
+
+def register_all_handlers(application) -> None:
+    """Registriert alle Telegram-Handler am Application-Objekt."""
+
+    # ── Lazy Import für schwere Module ────────────────────────────────────────
+    # InstantMesh erst beim ersten /mesh-Aufruf laden, nicht beim Start.
+    def _lazy_mesh_handler(update, context):
+        from instantmesh import mesh_handler
+        import asyncio
+        return asyncio.ensure_future(mesh_handler(update, context))
+
+    # ── Commands importieren ──────────────────────────────────────────────────
+    from handlers_cmd import (
+        start, handle_upload, handle_edit_command, handle_vision_command,
+        toggle_voice_response, handle_imagine, handle_textvideo, handle_stop_video,
+        handle_code, handle_yt_pdf_callback, handle_email_callback, handle_audit_callback,
+        cmd_synchromaster, cmd_synchroall, cmd_synchdata,
+        cmd_convert, cmd_textconvert, cmd_yt,
+        cmd_testbrain, cmd_chat, cmd_listbrain,
+        cmd_agent, cmd_workflow, cmd_social,
+        cmd_brainindex, cmd_semantic,
+        cmd_privacy, cmd_guard_status, cmd_audit,
+        cmd_gmail_auth, cmd_gmail_code, cmd_mailbatch,
+        cmd_voiceclone, cmd_myvoices, cmd_deletevoice, cmd_speak,
+        cmd_startstream, cmd_endstream, cmd_livevoice, cmd_scanner, handle_ttv26,
+        cmd_lyria, cmd_suno, cmd_freebeat, cmd_convert3d, cmd_text_to_3d, cmd_readme,
+        cmd_diagnose, cmd_planthealth,
+    )
+    from superagent import superagent_handler, superagent_callback
+    from openclaw import openclaw_handler, openclaw_callback
+    from claude_code import handle_claude_code
+    from brainlist_handler import cmd_brainlist as brainlist_cmd, brain_callback as brain_cb
+    from handlers_media import (
+        handle_photo, handle_voice, handle_audio_upload, handle_document,
+        handle_musik, handle_humming,
+    )
+    from handlers_chat import handle_message
+    from stickerpack import cmd_stickerpack, collect_sticker_for_pack, finish_stickerpack, handle_bg_callback
+    from gif_handler import handle_gif_command, collect_gif_for_session, finish_gif_session, cancel_gif_session
+    from trichome_analyzer import cmd_trichome_handler
+
+    # ── Command Handler ───────────────────────────────────────────────────────
+    application.add_handler(CommandHandler("start",          start))
+    application.add_handler(CommandHandler("upload",         handle_upload))
+
+    # Brain / Sync
+    application.add_handler(CommandHandler("synchromaster",  cmd_synchromaster))
+    application.add_handler(CommandHandler("synchroall",     cmd_synchroall))
+    application.add_handler(CommandHandler("synchdata",      cmd_synchdata))
+    application.add_handler(CommandHandler("testbrain",      cmd_testbrain))
+    application.add_handler(CommandHandler("chat",           cmd_chat))
+    application.add_handler(CommandHandler("listbrain",      cmd_listbrain))
+    application.add_handler(CommandHandler("brainindex",     cmd_brainindex))
+    application.add_handler(CommandHandler("semantic",       cmd_semantic))
+    application.add_handler(CommandHandler("brainlist",      brainlist_cmd))
+
+    # Konvertierung
+    application.add_handler(CommandHandler("convert",        cmd_convert))
+    application.add_handler(CommandHandler("textconvert",    cmd_textconvert))
+
+    # YouTube
+    application.add_handler(CommandHandler("yt",             cmd_yt))
+
+    # Voice & TTS
+    application.add_handler(CommandHandler("voicetoggle",    toggle_voice_response))
+    application.add_handler(CommandHandler("voiceclone",     cmd_voiceclone))
+    application.add_handler(CommandHandler("myvoices",       cmd_myvoices))
+    application.add_handler(CommandHandler("deletevoice",    cmd_deletevoice))
+    application.add_handler(CommandHandler("speak",          cmd_speak))
+    application.add_handler(CommandHandler("startstream",    cmd_startstream))
+    application.add_handler(CommandHandler("voicestream",    cmd_startstream))
+    application.add_handler(CommandHandler("endstream",      cmd_endstream))
+    application.add_handler(CommandHandler("stopstream",     cmd_endstream))
+    application.add_handler(CommandHandler("livevoice",      cmd_livevoice))
+
+    # Bild & Vision
+    application.add_handler(CommandHandler("imagine",        handle_imagine))
+    application.add_handler(CommandHandler("img",            handle_imagine))
+    application.add_handler(CommandHandler("edit",           handle_edit_command))
+    application.add_handler(CommandHandler("bearbeiten",     handle_edit_command))
+    application.add_handler(CommandHandler("vision",         handle_vision_command))
+    application.add_handler(CommandHandler("analyze",        handle_vision_command))
+    application.add_handler(CommandHandler("beschreib",      handle_vision_command))
+
+    # Musik
+    application.add_handler(CommandHandler("musik",          handle_musik))
+    application.add_handler(CommandHandler("humming",        handle_humming))
+    application.add_handler(CommandHandler("summen",         handle_humming))
+    application.add_handler(CommandHandler("lyria",          cmd_lyria))
+    application.add_handler(CommandHandler("suno",           cmd_suno))
+    application.add_handler(CommandHandler("freebeat",       cmd_freebeat))
+
+    # Video
+    application.add_handler(CommandHandler("textvideo",      handle_textvideo))
+    application.add_handler(CommandHandler("stopvideo",      handle_stop_video))
+    application.add_handler(CommandHandler("cancel",         handle_stop_video))
+    application.add_handler(CommandHandler("ttv26",          handle_ttv26))
+
+    # Code & Agent
+    application.add_handler(CommandHandler("code",           handle_code))
+    application.add_handler(CommandHandler(["clcode", "codeclaude", "codeclode"], handle_claude_code))
+    application.add_handler(CommandHandler("agent",          cmd_agent))
+    application.add_handler(CommandHandler("superagent",     superagent_handler))
+    application.add_handler(CommandHandler("openclaw",       openclaw_handler))
+
+    # Workflow & Social
+    application.add_handler(CommandHandler("workflow",       cmd_workflow))
+    application.add_handler(CommandHandler("social",         cmd_social))
+
+    # Privacy & Guard
+    application.add_handler(CommandHandler("privacy",        cmd_privacy))
+    application.add_handler(CommandHandler("guard",          cmd_guard_status))
+    application.add_handler(CommandHandler(["audit", "standard"], cmd_audit))
+
+    # E-Mail
+    application.add_handler(CommandHandler("gmail_auth",     cmd_gmail_auth))
+    application.add_handler(CommandHandler("gmail_code",     cmd_gmail_code))
+    application.add_handler(CommandHandler("mailbatch",      cmd_mailbatch))
+    application.add_handler(CommandHandler("emailbatch",     cmd_mailbatch))
+
+    # 3D / Scan / Sonstiges
+    application.add_handler(CommandHandler("mesh",           _lazy_mesh_handler))
+    application.add_handler(CommandHandler(["3d", "text3d", "instant3d"], cmd_text_to_3d))
+    application.add_handler(CommandHandler("convert3d",      cmd_convert3d))
+    application.add_handler(CommandHandler(["scan", "qr"],   cmd_scanner))
+
+    # Info
+    application.add_handler(CommandHandler("readme",         cmd_readme))
+    application.add_handler(CommandHandler("diagnose",       cmd_diagnose))
+
+    # Plant Health & Trichome
+    application.add_handler(CommandHandler(["planthealth", "lightmeter", "grow"], cmd_planthealth))
+    application.add_handler(CommandHandler(["trichome", "ernte", "harvest"],      cmd_trichome_handler))
+
+    # GIF & Sticker
+    application.add_handler(CommandHandler("gif",            handle_gif_command))
+    application.add_handler(CommandHandler("gifdone",        finish_gif_session))
+    application.add_handler(CommandHandler("gifcancel",      cancel_gif_session))
+    application.add_handler(CommandHandler("stickerpack",    cmd_stickerpack))
+    application.add_handler(CommandHandler("done",           finish_stickerpack))
+
+    # ── Message Handler (Priorität: höher = wird zuerst geprüft) ─────────────
+    # group=-1 → wird vor allen anderen Gruppen ausgeführt
+    application.add_handler(
+        MessageHandler(
+            (filters.PHOTO | filters.Document.IMAGE) & ~filters.COMMAND,
+            collect_gif_for_session,
+        ),
+        group=-1,
+    )
+    application.add_handler(
+        MessageHandler(
+            (filters.PHOTO | filters.Document.IMAGE) & ~filters.COMMAND,
+            collect_sticker_for_pack,
+        )
+    )
+
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,  handle_message))
+    application.add_handler(MessageHandler(filters.VOICE,                    handle_voice))
+    application.add_handler(MessageHandler(filters.AUDIO,                    handle_audio_upload))
+    application.add_handler(MessageHandler(filters.PHOTO,                    handle_photo))
+    application.add_handler(MessageHandler(filters.Document.ALL,             handle_document))
+
+    # ── Callback Query Handler ────────────────────────────────────────────────
+    application.add_handler(CallbackQueryHandler(handle_bg_callback,      pattern=r"^bg_(remove|keep):"))
+    application.add_handler(CallbackQueryHandler(handle_yt_pdf_callback,  pattern=r"^ytpdf\|"))
+    application.add_handler(CallbackQueryHandler(handle_email_callback,   pattern=r"^email\|"))
+    application.add_handler(CallbackQueryHandler(handle_audit_callback,   pattern=r"^audit:"))
+    application.add_handler(CallbackQueryHandler(superagent_callback,     pattern=r"^super:"))
+    application.add_handler(CallbackQueryHandler(openclaw_callback,       pattern=r"^openclaw:"))
+    application.add_handler(CallbackQueryHandler(brain_cb,               pattern=r"^brain:"))
+
+    logger.info("✅ Alle Handler registriert (%d Einträge)", len(application.handlers))

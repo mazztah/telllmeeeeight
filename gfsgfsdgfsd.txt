@@ -1,0 +1,24 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System deps
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    git \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Torch CPU (viel schneller/kleiner als GPU)
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+# Python deps (ohne torch in requirements.txt!)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# App
+COPY . .
+
+EXPOSE 8080
+
+CMD ["python", "main.py"]

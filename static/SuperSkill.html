@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Super-Skill.md Generator | Enterprise PowerSkill Creator</title>
+    <!-- KORRIGIERT: /static/css/ statt /css/ -->
+    <link rel="stylesheet" href="/static/css/super_skill.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/markdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-animation">
+        <div class="gradient-orb orb-1"></div>
+        <div class="gradient-orb orb-2"></div>
+        <div class="gradient-orb orb-3"></div>
+        <div class="grid-overlay"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="main-header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 40 40" fill="none">
+                        <path class="logo-path" d="M20 2L38 11V29L20 38L2 29V11L20 2Z" stroke="currentColor" stroke-width="2"/>
+                        <path class="logo-inner" d="M20 12L28 16.5V25.5L20 30L12 25.5V16.5L20 12Z" fill="currentColor" opacity="0.3"/>
+                        <circle cx="20" cy="21" r="3" fill="currentColor"/>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <span class="logo-title">Super-Skill</span>
+                    <span class="logo-subtitle">.md Generator</span>
+                </div>
+            </div>
+            <div class="header-status">
+                <div class="status-indicator online">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Groq Connected</span>
+                </div>
+                <div class="model-badge">
+                    <span class="model-icon">🧠</span>
+                    <span class="model-name">LLaMA-4 Scout</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="workspace">
+        <!-- Left Panel: Configuration -->
+        <section class="panel config-panel" id="configPanel">
+            <div class="panel-header">
+                <div class="panel-icon">⚙️</div>
+                <h2>Skill-Konfiguration</h2>
+                <div class="panel-toggle" onclick="togglePanel('configPanel')">
+                    <svg width="20" height="20" viewBox="0 0 20 20"><path d="M5 8l5 5 5-5" stroke="currentColor" fill="none" stroke-width="2"/></svg>
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <!-- Scope Input -->
+                <div class="input-group">
+                    <label class="input-label">
+                        <span class="label-icon">🎯</span>
+                        Skill-Scope
+                        <span class="required">*</span>
+                    </label>
+                    <textarea 
+                        id="scopeInput" 
+                        class="input-field textarea-field" 
+                        placeholder="Beschreibe, was der Skill können soll...
+
+z.B. Professionelles Technical Writing für API-Dokumentation und Architektur-Decision-Records"
+                        rows="3"
+                    ></textarea>
+                    <div class="input-hint">Min. 20 Zeichen für optimale Ergebnisse</div>
+                </div>
+
+                <!-- Audience Select -->
+                <div class="input-group">
+                    <label class="input-label">
+                        <span class="label-icon">👥</span>
+                        Zielgruppe
+                    </label>
+                    <select id="audienceSelect" class="input-field select-field">
+                        <option value="Junior Developer">Junior Developer</option>
+                        <option value="Senior Engineer" selected>Senior Engineer</option>
+                        <option value="Tech Lead">Tech Lead / Architect</option>
+                        <option value="Enterprise">Enterprise / C-Level</option>
+                        <option value="AI-Agent">AI-Agent / Autonomer Agent</option>
+                    </select>
+                </div>
+
+                <!-- Depth Select -->
+                <div class="input-group">
+                    <label class="input-label">
+                        <span class="label-icon">📊</span>
+                        Detaillierungsgrad
+                    </label>
+                    <div class="depth-slider">
+                        <input type="range" id="depthSlider" min="1" max="3" value="2" class="slider">
+                        <div class="slider-labels">
+                            <span>Überblick</span>
+                            <span>Detailliert</span>
+                            <span>Exhaustive</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Model Select -->
+                <div class="input-group">
+                    <label class="input-label">
+                        <span class="label-icon">🤖</span>
+                        Primäres KI-System
+                    </label>
+                    <select id="modelSelect" class="input-field select-field">
+                        <option value="Claude 4" selected>Claude 4 (Anthropic)</option>
+                        <option value="GPT-5">GPT-5 (OpenAI)</option>
+                        <option value="Grok 3">Grok 3 (xAI)</option>
+                        <option value="LLaMA-4">LLaMA-4 (Meta)</option>
+                        <option value="Universal">Universal / Alle</option>
+                    </select>
+                </div>
+
+                <!-- Workflows -->
+                <div class="input-group">
+                    <label class="input-label">
+                        <span class="label-icon">🔄</span>
+                        Kernszenarien (Workflows)
+                    </label>
+                    <div class="workflow-tags" id="workflowTags">
+                        <div class="workflow-tag active" data-value="Erstellung">
+                            <span class="tag-check">✓</span>
+                            <span>Erstellung</span>
+                        </div>
+                        <div class="workflow-tag active" data-value="Optimierung">
+                            <span class="tag-check">✓</span>
+                            <span>Optimierung</span>
+                        </div>
+                        <div class="workflow-tag" data-value="Review">
+                            <span class="tag-check">✓</span>
+                            <span>Review</span>
+                        </div>
+                        <div class="workflow-tag" data-value="Validierung">
+                            <span class="tag-check">✓</span>
+                            <span>Validierung</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button class="generate-btn" id="generateBtn" onclick="generateSkill()">
+                    <span class="btn-icon">
+                        <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        </svg>
+                    </span>
+                    <span class="btn-text">PowerSkill Generieren</span>
+                    <span class="btn-shine"></span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Center Panel: Preview/Editor -->
+        <section class="panel preview-panel" id="previewPanel">
+            <div class="panel-header">
+                <div class="panel-icon">👁️</div>
+                <h2>Vorschau & Editor</h2>
+                <div class="preview-tabs">
+                    <button class="tab-btn active" data-tab="preview" onclick="switchTab('preview')">
+                        <span>📄</span> Vorschau
+                    </button>
+                    <button class="tab-btn" data-tab="raw" onclick="switchTab('raw')">
+                        <span>📝</span> Raw Markdown
+                    </button>
+                    <button class="tab-btn" data-tab="split" onclick="switchTab('split')">
+                        <span>⚡</span> Split View
+                    </button>
+                </div>
+            </div>
+
+            <div class="panel-content preview-content" id="previewContent">
+                <!-- Empty State -->
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-animation">
+                        <div class="empty-orb"></div>
+                        <div class="empty-orb"></div>
+                        <div class="empty-orb"></div>
+                    </div>
+                    <h3>Kein Skill generiert</h3>
+                    <p>Konfiguriere deinen Skill links und klicke auf "PowerSkill Generieren"</p>
+                    <div class="empty-features">
+                        <div class="feature-item">
+                            <span class="feature-icon">🎯</span>
+                            <span>17 Pflichtabschnitte</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">📊</span>
+                            <span>Kompetenzmatrix</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">🔄</span>
+                            <span>Mermaid Workflows</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">✅</span>
+                            <span>Qualitäts-Checkliste</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Area -->
+                <div class="preview-area" id="previewArea" style="display: none;">
+                    <div class="preview-toolbar">
+                        <button class="toolbar-btn" onclick="copyToClipboard()" title="Kopieren">
+                            <span>📋</span> Kopieren
+                        </button>
+                        <button class="toolbar-btn" onclick="downloadSkill()" title="Download">
+                            <span>⬇️</span> Download
+                        </button>
+                        <button class="toolbar-btn secondary" onclick="showRefineModal()" title="Verbessern">
+                            <span>✨</span> Verbessern
+                        </button>
+                    </div>
+                    <div class="markdown-preview" id="markdownPreview"></div>
+                </div>
+
+                <!-- Raw Editor -->
+                <div class="raw-editor" id="rawEditor" style="display: none;">
+                    <textarea id="rawTextarea" class="raw-textarea" placeholder="Markdown wird hier angezeigt..."></textarea>
+                </div>
+
+                <!-- Split View -->
+                <div class="split-view" id="splitView" style="display: none;">
+                    <div class="split-left">
+                        <textarea id="splitTextarea" class="raw-textarea" oninput="updateSplitPreview()"></textarea>
+                    </div>
+                    <div class="split-right">
+                        <div class="markdown-preview" id="splitPreview"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Chat -->
+        <section class="panel chat-panel" id="chatPanel">
+            <div class="panel-header">
+                <div class="panel-icon">💬</div>
+                <h2>Groq Assistant</h2>
+                <div class="chat-status">
+                    <span class="status-dot online"></span>
+                    <span class="status-text">Online</span>
+                </div>
+            </div>
+
+            <div class="panel-content chat-content">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message system-message">
+                        <div class="message-avatar">
+                            <span>🧠</span>
+                        </div>
+                        <div class="message-content">
+                            <div class="message-header">
+                                <span class="message-author">Groq Assistant</span>
+                                <span class="message-time">Jetzt</span>
+                            </div>
+                            <div class="message-text">
+                                Willkommen beim <strong>Super-Skill.md Generator</strong>! 🚀<br><br>
+                                Ich bin dein AI-Assistent mit integriertem <strong>Perfect PowerSkill Creator</strong> Meta-Skill. Ich kann dir helfen bei:<br><br>
+                                • Skill-Scope Definition und Optimierung<br>
+                                • Workflow-Design mit Mermaid-Diagrammen<br>
+                                • Qualitäts-Prüfung nach Enterprise-Standards<br>
+                                • Refinement und Iteration bestehender Skills<br><br>
+                                <em>Stelle einfach eine Frage oder beschreibe deinen Skill-Bedarf!</em>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="chatInput" 
+                            class="chat-input" 
+                            placeholder="Frage stellen oder Skill beschreiben..."
+                            rows="1"
+                            onkeydown="handleChatKeydown(event)"
+                        ></textarea>
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="chat-hints">
+                        <span class="hint">Enter zum Senden</span>
+                        <span class="hint">Shift+Enter für neue Zeile</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Bottom Panel: Generated Skills Library -->
+    <section class="skills-library" id="skillsLibrary">
+        <div class="library-header">
+            <div class="library-title">
+                <span class="library-icon">📚</span>
+                <h3>Generierte Skills</h3>
+                <span class="library-count" id="skillsCount">0</span>
+            </div>
+            <div class="library-actions">
+                <button class="library-btn" onclick="refreshSkillsList()">
+                    <span>🔄</span> Aktualisieren
+                </button>
+                <button class="library-btn" onclick="toggleLibrary()">
+                    <span id="libraryToggleIcon">🔼</span>
+                </button>
+            </div>
+        </div>
+        <div class="library-content" id="libraryContent">
+            <div class="skills-grid" id="skillsGrid">
+                <!-- Skills werden hier dynamisch eingefügt -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Refine Modal -->
+    <div class="modal-overlay" id="refineModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>✨ Skill verbessern</h3>
+                <button class="modal-close" onclick="closeRefineModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <p>Beschreibe, was verbessert werden soll:</p>
+                <textarea id="refineInput" class="refine-textarea" placeholder="z.B. Füge mehr Anti-Patterns hinzu, erweitere die Kompetenzmatrix, oder passe den Ton an..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn secondary" onclick="closeRefineModal()">Abbrechen</button>
+                <button class="modal-btn primary" onclick="refineSkill()">
+                    <span>✨</span> Verbessern
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner">
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+            </div>
+            <h3 class="loading-title">Generiere PowerSkill...</h3>
+            <p class="loading-subtitle">LLaMA-4 Scout analysiert Scope, erstellt Struktur, generiert Inhalte</p>
+            <div class="loading-steps">
+                <div class="step" id="step1">
+                    <span class="step-icon">1</span>
+                    <span class="step-text">Scope-Analyse</span>
+                </div>
+                <div class="step" id="step2">
+                    <span class="step-icon">2</span>
+                    <span class="step-text">Struktur-Design</span>
+                </div>
+                <div class="step" id="step3">
+                    <span class="step-icon">3</span>
+                    <span class="step-text">Inhalts-Generierung</span>
+                </div>
+                <div class="step" id="step4">
+                    <span class="step-icon">4</span>
+                    <span class="step-text">Qualitäts-Prüfung</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- KORRIGIERT: /static/js/ statt /js/ -->
+    <script src="/static/js/super_skill.js"></script>
+</body>
+</html>

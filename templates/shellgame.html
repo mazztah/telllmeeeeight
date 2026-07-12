@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>NEON SHELL GAME 2077</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.167.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.167.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-magenta: #ff00ff;
+            --neon-yellow: #fdf000;
+            --dark-bg: #05000a;
+            --glass: rgba(20, 0, 40, 0.7);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: var(--dark-bg); 
+            overflow: hidden; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            color: white; 
+            perspective: 1000px;
+            touch-action: none;
+        }
+        canvas { display: block; }
+
+        /* HUD Design */
+        #hud {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 100;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: 30px;
+        }
+
+        .glass-panel {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--neon-cyan);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+            border-radius: 10px;
+            pointer-events: auto;
+            padding: 20px;
+        }
+
+        #top-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .stat-box { text-align: center; flex: 1; min-width: 80px; }
+        .label { font-size: 12px; text-transform: uppercase; color: var(--neon-cyan); letter-spacing: 2px; }
+        .value { font-size: 24px; font-weight: bold; text-shadow: 0 0 10px var(--neon-cyan); }
+
+        #dealer-chat {
+            position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 400px; text-align: center; font-style: italic;
+            font-size: 18px; color: var(--neon-magenta);
+            text-shadow: 0 0 5px black; opacity: 0; transition: opacity 0.3s;
+            pointer-events: none;
+        }
+
+        #controls {
+            display: flex; justify-content: center; gap: 15px; align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: transparent; border: 2px solid var(--neon-cyan);
+            color: var(--neon-cyan); padding: 12px 24px; cursor: pointer;
+            font-weight: bold; text-transform: uppercase; transition: all 0.2s;
+            clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+            font-size: 14px;
+        }
+        .btn:hover:not(:disabled) {
+            background: var(--neon-cyan); color: black; box-shadow: 0 0 20px var(--neon-cyan);
+        }
+        .btn:disabled { opacity: 0.3; border-color: gray; color: gray; }
+
+        #bet-controls { display: flex; align-items: center; gap: 10px; }
+        .bet-btn { 
+            width: 36px; height: 36px; border-radius: 50%; 
+            border: 1px solid var(--neon-cyan); background: none; 
+            color: white; cursor: pointer; font-size: 18px; display: flex;
+            align-items: center; justify-content: center;
+        }
+
+        /* Leaderboard Modal */
+        #leaderboard-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            width: 90%; max-width: 320px; display: none; z-index: 1000;
+        }
+        .lb-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(0,243,255,0.2); }
+
+        /* Telegram WebApp Header spacing */
+        #tg-header {
+            position: absolute; top: 0; left: 0; width: 100%;
+            background: rgba(5, 0, 10, 0.9);
+            border-bottom: 1px solid var(--neon-cyan);
+            padding: 8px 16px;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 200;
+            font-size: 13px;
+        }
+        #tg-header .tg-user { color: var(--neon-cyan); font-weight: bold; }
+        #tg-header .tg-score { color: var(--neon-yellow); }
+
+        .glitch { animation: glitch 0.3s infinite; }
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        @media (max-width: 600px) {
+            #hud { padding: 15px; padding-top: 45px; }
+            .value { font-size: 20px; }
+            #dealer-chat { font-size: 15px; top: 80px; }
+            .btn { padding: 10px 18px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="tg-header">
+        <span class="tg-user" id="tg-user-display">NEON SHELL 2077</span>
+        <span class="tg-score" id="tg-score-display">Ȼ 1000</span>
+    </div>
+
+    <div id="hud">
+        <div id="top-bar">
+            <div class="glass-panel stat-box">
+                <div class="label">User</div>
+                <div id="user-display" class="value">---</div>
+            </div>
+            <div class="glass-panel stat-box">
+                <div class="label">Credits</div>
+                <div id="balance" class="value">1000</div>
+            </div>
+            <div class="glass-panel stat-box">
+                <div class="label">Highscore</div>
+                <div id="highscore" class="value">0</div>
+            </div>
+        </div>
+
+        <div id="dealer-chat">Willkommen im Neon-Sumpf, Choom...</div>
+
+        <div id="controls">
+            <div class="glass-panel" id="bet-controls">
+                <button class="bet-btn" id="bet-minus">−</button>
+                <div style="text-align:center; min-width: 60px;">
+                    <div class="label">Bet</div>
+                    <div id="bet-amount" class="value">50</div>
+                </div>
+                <button class="bet-btn" id="bet-plus">+</button>
+            </div>
+            <button class="btn" id="play-btn">Spielfeld Aktivieren</button>
+            <button class="btn" id="lb-btn">Bestenliste</button>
+        </div>
+    </div>
+
+    <div id="leaderboard-modal" class="glass-panel">
+        <h3 style="color: var(--neon-cyan); margin-bottom: 15px; text-align: center;">TOP ROLLERS</h3>
+        <div id="lb-content"></div>
+        <button class="btn" style="width: 100%; margin-top: 15px;" onclick="document.getElementById('leaderboard-modal').style.display='none'">Schließen</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // ── Telegram WebApp Integration ──────────────────────────────────────
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        class CyberShellGame {
+            constructor() {
+                this.initThree();
+                this.initGameLogic();
+                this.setupUI();
+                this.setupTelegramUser();
+                this.animate();
+            }
+
+            setupTelegramUser() {
+                // Nutze Telegram User statt manueller Eingabe
+                const user = tg.initDataUnsafe?.user;
+                if (user) {
+                    this.userName = user.first_name || user.username || "Choom";
+                    if (user.last_name) this.userName += " " + user.last_name;
+                } else {
+                    this.userName = "Guest_" + Math.floor(Math.random() * 9999);
+                }
+                
+                document.getElementById('user-display').textContent = this.userName;
+                document.getElementById('tg-user-display').textContent = this.userName;
+                this.loadPlayerData();
+            }
+
+            initThree() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x020005);
+                this.scene.fog = new THREE.FogExp2(0x020005, 0.05);
+
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 7, 10);
+
+                this.renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.toneMapping = THREE.ReinhardToneMapping;
+
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableZoom = false;
+                this.controls.enablePan = false;
+                this.controls.maxPolarAngle = Math.PI / 2.1;
+
+                // Post Processing (Bloom)
+                const renderScene = new RenderPass(this.scene, this.camera);
+                this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+                this.bloomPass.threshold = 0.2;
+                this.bloomPass.strength = 1.2;
+                
+                this.composer = new EffectComposer(this.renderer);
+                this.composer.addPass(renderScene);
+                this.composer.addPass(this.bloomPass);
+
+                this.initLights();
+                this.createTable();
+                this.createHuts();
+            }
+
+            initLights() {
+                const ambient = new THREE.AmbientLight(0x404040, 0.5);
+                this.scene.add(ambient);
+
+                const spot1 = new THREE.SpotLight(0x00f3ff, 10);
+                spot1.position.set(-5, 10, 5);
+                spot1.castShadow = true;
+                this.scene.add(spot1);
+
+                const spot2 = new THREE.SpotLight(0xff00ff, 10);
+                spot2.position.set(5, 10, 5);
+                spot2.castShadow = true;
+                this.scene.add(spot2);
+            }
+
+            createTable() {
+                // Glossy Obsidian Table
+                const geo = new THREE.BoxGeometry(15, 0.5, 10);
+                const mat = new THREE.MeshStandardMaterial({ 
+                    color: 0x05000a, 
+                    metalness: 1.0, 
+                    roughness: 0.1 
+                });
+                const table = new THREE.Mesh(geo, mat);
+                table.position.y = 0;
+                this.scene.add(table);
+
+                // Neon Border
+                const borderGeo = new THREE.BoxGeometry(15.2, 0.1, 10.2);
+                const borderMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
+                const border = new THREE.Mesh(borderGeo, borderMat);
+                border.position.y = 0.2;
+                this.scene.add(border);
+            }
+
+            createHuts() {
+                this.huts = [];
+                this.positions = [
+                    new THREE.Vector3(-4, 0.5, 0),
+                    new THREE.Vector3(0, 0.5, 0),
+                    new THREE.Vector3(4, 0.5, 0)
+                ];
+
+                for (let i = 0; i < 3; i++) {
+                    const group = new THREE.Group();
+
+                    // Metallic Shell
+                    const shellGeo = new THREE.CylinderGeometry(1, 1.2, 1.5, 32);
+                    const shellMat = new THREE.MeshStandardMaterial({ 
+                        color: 0x333333, 
+                        metalness: 1.0, 
+                        roughness: 0.2,
+                        emissive: 0x000000
+                    });
+                    const shell = new THREE.Mesh(shellGeo, shellMat);
+                    shell.castShadow = true;
+                    group.add(shell);
+
+                    // Neon Ring
+                    const ringGeo = new THREE.TorusGeometry(1.1, 0.03, 16, 100);
+                    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
+                    const ring = new THREE.Mesh(ringGeo, ringMat);
+                    ring.rotation.x = Math.PI / 2;
+                    ring.position.y = 0.75;
+                    group.add(ring);
+
+                    group.position.copy(this.positions[i]);
+                    group.userData = { id: i };
+                    this.huts.push(group);
+                    this.scene.add(group);
+                }
+
+                // The Data Core (The Nut)
+                const coreGeo = new THREE.SphereGeometry(0.3, 32, 32);
+                const coreMat = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+                this.core = new THREE.Mesh(coreGeo, coreMat);
+                this.core.position.set(0, 0.6, 0);
+                this.core.visible = false;
+                this.scene.add(this.core);
+            }
+
+            initGameLogic() {
+                this.userName = "Guest";
+                this.balance = 1000;
+                this.bet = 50;
+                this.highscore = 0;
+                this.gameState = 'IDLE'; // IDLE, MIXING, GUESSING
+                this.correctHut = 1;
+                this.dealerPhrases = [
+                    "Setz deine Credits, Chooom!!",
+                    "Glaubst du wirklich, du kannst mich austricksen?",
+                    "Deine Augen sind zu langsam für meinen Code...",
+                    "Glück ist nur ein Fehler in der Matrix.",
+                    "Alles oder nichts, Hacker!"
+                ];
+            }
+
+            setupUI() {
+                // Betting
+                document.getElementById('bet-plus').addEventListener('click', () => {
+                    if (this.bet + 50 <= this.balance) this.bet += 50;
+                    this.updateHUD();
+                });
+                document.getElementById('bet-minus').addEventListener('click', () => {
+                    if (this.bet > 50) this.bet -= 50;
+                    this.updateHUD();
+                });
+
+                // Gameplay
+                document.getElementById('play-btn').addEventListener('click', () => this.startMix());
+                document.getElementById('lb-btn').addEventListener('click', () => this.showLeaderboard());
+
+                // Touch/Click on 3D Huts
+                const canvas = this.renderer.domElement;
+                
+                const handleInteraction = (clientX, clientY) => {
+                    if (this.gameState !== 'GUESSING') return;
+                    
+                    const raycaster = new THREE.Raycaster();
+                    const mouse = new THREE.Vector2();
+                    mouse.x = (clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+                    raycaster.setFromCamera(mouse, this.camera);
+                    const intersects = raycaster.intersectObjects(this.huts, true);
+
+                    if (intersects.length > 0) {
+                        const hutGroup = intersects[0].object.parent;
+                        this.handleGuess(hutGroup.userData.id);
+                    }
+                };
+
+                canvas.addEventListener('mousedown', (e) => handleInteraction(e.clientX, e.clientY));
+                canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    if (e.touches.length > 0) {
+                        handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
+                    }
+                }, { passive: false });
+            }
+
+            loadPlayerData() {
+                // Lade aus localStorage als Cache
+                const data = JSON.parse(localStorage.getItem('cyber_shell_data') || '{}');
+                if (data[this.userName]) {
+                    this.balance = data[this.userName].balance || 1000;
+                    this.highscore = data[this.userName].highscore || 0;
+                }
+                document.getElementById('highscore').textContent = this.highscore;
+                this.updateHUD();
+            }
+
+            async savePlayerData() {
+                // localStorage Update
+                const data = JSON.parse(localStorage.getItem('cyber_shell_data') || '{}');
+                if (this.balance > this.highscore) {
+                    this.highscore = this.balance;
+                    document.getElementById('highscore').textContent = this.highscore;
+                }
+                data[this.userName] = { balance: this.balance, highscore: this.highscore };
+                localStorage.setItem('cyber_shell_data', JSON.stringify(data));
+
+                // Server-API Update
+                try {
+                    const apiBase = this._getApiBase();
+                    await fetch(`${apiBase}/save_score`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: this.userName,
+                            balance: this.balance,
+                            highscore: this.highscore
+                        })
+                    });
+                } catch (e) {
+                    console.warn('Server-Sync fehlgeschlagen:', e);
+                }
+            }
+
+            _getApiBase() {
+                const firstSegment = (window.location.pathname.split('/').filter(Boolean)[0] || 'shellgame').trim();
+                return `${window.location.origin}/${firstSegment}/api`;
+            }
+
+            updateHUD() {
+                document.getElementById('balance').textContent = this.balance;
+                document.getElementById('bet-amount').textContent = this.bet;
+                document.getElementById('tg-score-display').textContent = 'Ȼ ' + this.balance;
+            }
+
+            sayDealer(text) {
+                const el = document.getElementById('dealer-chat');
+                el.textContent = text;
+                el.style.opacity = 1;
+                setTimeout(() => el.style.opacity = 0, 3000);
+            }
+
+            async startMix() {
+                if (this.balance < this.bet) {
+                    this.sayDealer("Du bist pleite, Choom. Geh an die Ecke!");
+                    return;
+                }
+
+                this.gameState = 'MIXING';
+                document.getElementById('play-btn').disabled = true;
+                this.core.visible = false;
+                this.sayDealer(this.dealerPhrases[Math.floor(Math.random() * this.dealerPhrases.length)]);
+
+                this.correctHut = Math.floor(Math.random() * 3);
+                
+                // Mixing Animation Sequence
+                const shuffleCount = 6;
+                for (let i = 0; i < shuffleCount; i++) {
+                    await this.shuffleHuts();
+                }
+
+                this.gameState = 'GUESSING';
+                this.sayDealer("WÄHLE WEISE. Tippe auf einen Hut!");
+            }
+
+            shuffleHuts() {
+                return new Promise(resolve => {
+                    const h1 = Math.floor(Math.random() * 3);
+                    const h2 = Math.floor(Math.random() * 3);
+                    if (h1 === h2) return resolve();
+
+                    const pos1 = this.positions[h1].clone();
+                    const pos2 = this.positions[h2].clone();
+
+                    gsap.to(this.huts[h1].position, {
+                        x: pos2.x, z: pos2.z, duration: 0.4, ease: "power2.inOut",
+                        onComplete: () => {
+                            this.positions[h1].copy(pos2);
+                            resolve();
+                        }
+                    });
+                    gsap.to(this.huts[h2].position, {
+                        x: pos1.x, z: pos1.z, duration: 0.4, ease: "power2.inOut",
+                        onComplete: () => {
+                            this.positions[h2].copy(pos1);
+                        }
+                    });
+                });
+            }
+
+            handleGuess(id) {
+                this.gameState = 'RESULT';
+                const isWin = (id === this.correctHut);
+                
+                // Reveal Core
+                const winningHut = this.huts[this.correctHut];
+                this.core.position.copy(winningHut.position);
+                this.core.position.y = 0.6;
+                this.core.visible = true;
+
+                // Lift all huts
+                this.huts.forEach(h => gsap.to(h.position, { y: 2, duration: 0.5 }));
+
+                if (isWin) {
+                    const winAmount = this.bet * 3;
+                    this.balance += winAmount;
+                    this.sayDealer(`GLÜCKSTREFFER! +${winAmount} Credits!`);
+                    document.getElementById('hud').classList.add('glitch');
+                } else {
+                    this.balance -= this.bet;
+                    this.sayDealer(`Systemfehler! Du hast verloren. -${this.bet} Credits.`);
+                }
+
+                this.updateHUD();
+                this.savePlayerData();
+
+                setTimeout(() => {
+                    this.huts.forEach(h => gsap.to(h.position, { y: 0.5, duration: 0.5 }));
+                    this.core.visible = false;
+                    document.getElementById('hud').classList.remove('glitch');
+                    document.getElementById('play-btn').disabled = false;
+                    this.gameState = 'IDLE';
+                }, 2000);
+            }
+
+            async showLeaderboard() {
+                let sorted = [];
+                
+                // Versuche Server-Leaderboard zu laden
+                try {
+                    const apiBase = this._getApiBase();
+                    const resp = await fetch(`${apiBase}/leaderboard`);
+                    const data = await resp.json();
+                    if (data.success && data.leaderboard) {
+                        sorted = data.leaderboard.map(entry => [entry.name, { highscore: entry.highscore, balance: entry.balance }]);
+                    }
+                } catch (e) {
+                    console.warn('Server-Leaderboard fehlgeschlagen, nutze localStorage:', e);
+                }
+
+                // Fallback auf localStorage
+                if (sorted.length === 0) {
+                    const localData = JSON.parse(localStorage.getItem('cyber_shell_data') || '{}');
+                    sorted = Object.entries(localData)
+                        .sort((a, b) => (b[1].highscore || 0) - (a[1].highscore || 0))
+                        .slice(0, 5);
+                }
+
+                const content = document.getElementById('lb-content');
+                content.innerHTML = sorted.map(([name, stats], idx) => `
+                    <div class="lb-row">
+                        <span>#${idx + 1} ${name}</span>
+                        <span style="color:var(--neon-yellow)">${stats.highscore || stats.balance || 0} Ȼ</span>
+                    </div>
+                `).join('');
+
+                document.getElementById('leaderboard-modal').style.display = 'block';
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.controls.update();
+                this.composer.render();
+                
+                // Subtle Floating Movement for Huts
+                this.huts.forEach((h, i) => {
+                    if (this.gameState === 'IDLE') {
+                        h.position.y = 0.5 + Math.sin(Date.now() * 0.002 + i) * 0.1;
+                    }
+                });
+            }
+        }
+
+        window.game = new CyberShellGame();
+
+        window.addEventListener('resize', () => {
+            window.game.camera.aspect = window.innerWidth / window.innerHeight;
+            window.game.camera.updateProjectionMatrix();
+            window.game.renderer.setSize(window.innerWidth, window.innerHeight);
+            window.game.composer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Queen's Plant-ID</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="/static/plantid.css">
+</head>
+<body>
+<canvas id="particleCanvas"></canvas>
+<div class="header"><h1>🌿 Queen's Plant-ID</h1><p>Identifiziere Pflanzen per KI – Cannabis, Zimmerpflanzen, Wildblumen</p></div>
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('scan')">📸 Scanner</button>
+  <button class="tab" onclick="switchTab('result')">🎯 Ergebnis</button>
+  <button class="tab" onclick="switchTab('info')">📖 Tipps</button>
+</div>
+<div class="contentWrap">
+  <div id="scanTab" class="section active">
+    <div class="uploadZone" id="dropZone">
+      <div class="icon" id="uploadIcon">📸</div>
+      <p id="uploadText">Tippen für Galerie / Kamera</p>
+      <p class="sub" id="uploadSub">oder Foto hierher ziehen</p>
+      <button class="camBtn" onclick="event.stopPropagation();startCamera()">📷 Live-Vorschau</button>
+    </div>
+    <video id="videoPreview" autoplay playsinline muted></video>
+    <button id="snapBtn" onclick="snap()">🍃 Foto aufnehmen</button>
+    <button id="analyzeBtn" onclick="analyze()">🔍 Pflanze analysieren</button>
+    <canvas id="hiddenCanvas" style="display:none;"></canvas>
+    <div class="spinner" id="spinner"></div>
+    <div id="statusLine">Bereit – Kamera starten oder Foto hochladen</div>
+  </div>
+
+  <div id="resultTab" class="section">
+    <div id="resultContainer">
+      <div style="text-align:center;color:#557755;padding:50px 20px;">
+        <div style="font-size:3rem;margin-bottom:12px;">🌿</div>
+        <p>Noch keine Analyse durchgeführt.<br>Wechsle zum Scanner!</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="infoTab" class="section">
+    <div class="infoCard"><h3>📸 Foto-Tipps für beste Ergebnisse</h3><ul><li>Gutes Tageslicht nutzen (kein Blitz)</li><li>Blätter und Blüten sollten sichtbar sein</li><li>20–50 cm Abstand zur Pflanze</li><li>Mehrere Fotos von verschiedenen Winkeln</li><li>Makro-Modus für kleine Details</li></ul></div>
+    <div class="infoCard"><h3>🧬 Wie funktioniert die KI?</h3><p>Unser System nutzt <b>PlantNet</b> – eines der größten wissenschaftlichen Pflanzen-Erkennungs-Netzwerke. Die Bilder werden mit Millionen verifizierter Herbarium-Fotos abgeglichen.</p><p>Zusätzlich liefern wir Pflege-Daten von <b>Perenual</b> und Beschreibungen aus <b>Wikipedia</b>.</p></div>
+    <div class="infoCard"><h3>🌱 Unterstützte Pflanzen</h3><ul><li><b>Cannabis</b> – alle Sorten & Stadien</li><li><b>Zimmerpflanzen</b> – Monstera, Ficus, etc.</li><li><b>Gartenpflanzen</b> – Gemüse, Kräuter, Blumen</li><li><b>Wildpflanzen</b> – Bäume, Sträucher, Gräser</li></ul></div>
+    <div class="infoCard"><h3>⚠️ Demo-Modus</h3><p>Ohne API-Key wird eine Demo-Analyse mit Cannabis sativa angezeigt. Für echte Ergebnisse: <code>PLANTNET_API_KEY</code> als Umgebungsvariable setzen.</p></div>
+  </div>
+</div>
+
+<div class="footer">
+  <button class="footBtn secondary" onclick="resetAll()">🔄 Neu</button>
+  <button class="footBtn primary" onclick="sendToBot()">📤 An Bot</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+let stream=null,capturedB64=null,currentAnalysisResult=null,chatHistory=[];
+
+const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+if(tg){ tg.expand(); tg.ready(); }
+
+(function(){
+  const c=$('particleCanvas'),x=c.getContext('2d');
+  let w,h,p=[];
+  function resize(){w=c.width=innerWidth;h=c.height=innerHeight;}
+  resize();window.addEventListener('resize',resize);
+  for(let i=0;i<60;i++)p.push({x:Math.random()*w,y:Math.random()*h,r:Math.random()*2+1,d:Math.random()*Math.PI*2,s:Math.random()*0.4+0.1,a:Math.random()*0.6});
+  function draw(){
+    x.clearRect(0,0,w,h);
+    p.forEach(p=>{
+      p.x+=Math.cos(p.d)*p.s;p.y+=Math.sin(p.d)*p.s;
+      if(p.x<0)p.x=w;if(p.x>w)p.x=0;if(p.y<0)p.y=h;if(p.y>h)p.y=0;
+      x.beginPath();x.arc(p.x,p.y,p.r,0,Math.PI*2);
+      x.fillStyle=`rgba(0,230,160,${p.a})`;x.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  $(name+'Tab').classList.add('active');
+  document.querySelector(`[onclick="switchTab('${name}')"]`).classList.add('active');
+}
+
+async function startCamera(){
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment',width:{ideal:1920},height:{ideal:1080}}});
+    const v=$('videoPreview');v.srcObject=stream;v.style.display='block';v.play();
+    $('dropZone').style.display='none';
+    $('snapBtn').style.display='block';
+    $('analyzeBtn').style.display='none';
+    $('statusLine').textContent='Kamera aktiv – Foto aufnehmen';
+  }catch(e){
+    showToast('Kamera-Fehler: '+e.message);
+  }
+}
+
+function stopCamera(){
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  $('videoPreview').style.display='none';
+  $('dropZone').style.display='block';
+  $('snapBtn').style.display='none';
+}
+
+function snap(){
+  const v=$('videoPreview'),c=$('hiddenCanvas'),ctx=c.getContext('2d');
+  c.width=v.videoWidth||640;c.height=v.videoHeight||480;
+  ctx.drawImage(v,0,0,c.width,c.height);
+  capturedB64=c.toDataURL('image/jpeg',0.9).split(',')[1];
+  stopCamera();
+  $('analyzeBtn').style.display='block';
+  $('analyzeBtn').textContent='🔍 Pflanze analysieren';
+  $('statusLine').textContent='✅ Foto erfasst – jetzt analysieren!';
+}
+
+const dz=$('dropZone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault();dz.classList.remove('dragover');
+  const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))readFile(f);
+});
+dz.addEventListener('click',()=>{
+  if(stream)return;
+  const i=document.createElement('input');i.type='file';i.accept='image/*';i.capture='environment';
+  i.onchange=e=>{const f=e.target.files[0];if(f)readFile(f);};
+  i.click();
+});
+
+function readFile(file){
+  const r=new FileReader();
+  r.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=$('hiddenCanvas'),ctx=c.getContext('2d');
+      const maxDim=1600;
+      let w=img.width,h=img.height;
+      if(w>maxDim || h>maxDim){
+        if(w>h){h=Math.round(h*maxDim/w);w=maxDim;}
+        else{w=Math.round(w*maxDim/h);h=maxDim;}
+      }
+      c.width=w;c.height=h;
+      ctx.drawImage(img,0,0,w,h);
+      capturedB64=c.toDataURL('image/jpeg',0.85).split(',')[1];
+      $('dropZone').style.display='none';
+      $('analyzeBtn').style.display='block';
+      $('statusLine').textContent='✅ Bild geladen – jetzt analysieren!';
+    };
+    img.src=e.target.result;
+  };
+  r.readAsDataURL(file);
+}
+
+async function analyze(){
+  if(!capturedB64){showToast('Bitte zuerst ein Foto aufnehmen!');return;}
+  $('spinner').style.display='block';
+  $('analyzeBtn').disabled=true;
+  $('analyzeBtn').textContent='⏳ Analysiere...';
+  $('statusLine').textContent='KI analysiert Bild – PlantNet + Perenual...';
+  try{
+    const r=await fetch('/plantid/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_base64:capturedB64})});
+    const d=await r.json();
+    if(d.success){
+      currentAnalysisResult=d;
+      renderResult(d);
+      switchTab('result');
+      speakResult(d);
+    }else{
+      showToast('Fehler: '+(d.error||'Unbekannt'));
+    }
+  }catch(e){
+    showToast('Netzwerkfehler: '+e.message);
+  }finally{
+    $('spinner').style.display='none';
+    $('analyzeBtn').disabled=false;
+    $('analyzeBtn').textContent='🔍 Erneut analysieren';
+    $('statusLine').textContent='Analyse abgeschlossen';
+  }
+}
+
+function renderResult(d){
+  const id=d.identification||{};
+  const best=id.best_match||{};
+  const details=d.details||{};
+  const wiki=d.wikipedia||{};
+  const wikiCare=d.wikipedia_care||{};
+  const diseases=d.diseases||[];
+  const demo=d.demo_mode;
+  const plantName=(best.common_names&&best.common_names[0])||best.scientific_name||'Unbekannt';
+
+  let html='<div class="resultCard">';
+  html+=`<div class="gaugeWrap"><svg viewBox="0 0 180 180" width="180" height="180">
+    <circle cx="90" cy="90" r="75" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="12"/>
+    <circle cx="90" cy="90" r="75" fill="none" stroke="url(#ggrad)" stroke-width="12"
+      stroke-linecap="round" stroke-dasharray="${Math.round(best.confidence*4.71)} 471"
+      transform="rotate(-90 90 90)" style="transition:stroke-dasharray 1.2s ease;"/>
+    <defs><linearGradient id="ggrad"><stop offset="0%" stop-color="#00e6a0"/><stop offset="100%" stop-color="#ffd700"/></linearGradient></defs>
+  </svg><div class="gaugeCenter"><div class="big">${best.confidence||0}%</div><div class="small">Konfidenz</div></div></div>`;
+
+  const imgUrl=details.image_url||wiki.image_url||'';
+  html+=`<div class="matchRow">`;
+  if(imgUrl)html+=`<img src="${imgUrl}" class="matchImg" alt="Plant">`;
+  html+=`<div class="matchInfo">
+    <div class="matchName">${plantName}</div>
+    <div class="matchLatin">${best.scientific_name||''}</div>
+    <div class="matchTags">
+      <span class="tag family">${best.family||'—'}</span>
+      <span class="tag genus">${best.genus||'—'}</span>
+      ${demo?'<span class="tag demo">DEMO</span>':''}
+    </div></div></div>`;
+
+  if(details && Object.keys(details).length>0){
+    html+=`<div class="careGrid">
+      <div class="careCard"><div class="emoji">💧</div><div class="lbl">Gießen</div><div class="val">${details.watering||'—'}</div></div>
+      <div class="careCard"><div class="emoji">☀️</div><div class="lbl">Licht</div><div class="val">${Array.isArray(details.sunlight)?details.sunlight.join(', '):(details.sunlight||'—')}</div></div>
+      <div class="careCard"><div class="emoji">📊</div><div class="lbl">Pflege</div><div class="val">${details.care_level||'—'}</div></div>
+      <div class="careCard"><div class="emoji">🔄</div><div class="lbl">Zyklus</div><div class="val">${details.cycle||'—'}</div></div>
+    </div>`;
+    if((details.poisonous_to_pets||details.poisonous_to_humans)){
+      html+=`<div style="background:rgba(255,77,141,0.12);border:1px solid rgba(255,77,141,0.3);border-radius:14px;padding:12px;text-align:center;font-size:0.85rem;color:var(--rose);margin-bottom:14px;">
+        ☠️ Giftig für ${details.poisonous_to_pets?'Haustiere ':''}${details.poisonous_to_humans?'Menschen':''}</div>`;
+    }
+  }
+
+  if(wikiCare && wikiCare.extract){
+    html+=`<div class="wikiBox">
+      <div class="wikiTitle">🌱 ${wikiCare.title||'Wikipedia Pflegetipps'}</div>
+      <p class="wikiText">${wikiCare.extract}</p>
+      ${wikiCare.wiki_url?`<a href="${wikiCare.wiki_url}" target="_blank">Mehr lesen →</a>`:''}
+    </div>`;
+  }
+
+  if(wiki && wiki.extract){
+    html+=`<div class="wikiBox">
+      <div class="wikiTitle">📖 ${wiki.title||'Wikipedia'}</div>
+      <p class="wikiText">${wiki.extract}</p>
+      ${wiki.wiki_url?`<a href="${wiki.wiki_url}" target="_blank">Mehr auf Wikipedia →</a>`:''}
+    </div>`;
+  }
+
+  if(diseases.length>0){
+    html+=`<div style="margin-top:18px;"><p style="font-size:0.75rem;color:#557755;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">🦠 Krankheiten & Schädlinge</p>`;
+    diseases.slice(0,3).forEach(dis=>{
+      html+=`<div class="altItem" style="align-items:flex-start;flex-direction:column;gap:4px;">
+        <span class="altName">${dis.name||'—'}</span>
+        <span style="font-size:0.7rem;color:#aaa;">${dis.description?dis.description.slice(0,120)+'…':'—'}</span>
+        ${dis.solution?`<span style="font-size:0.7rem;color:var(--leaf);">✅ ${dis.solution.slice(0,120)}…</span>`:''}
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  const alts=id.all_results||[];
+  if(alts.length>1){
+    html+=`<div style="margin-top:18px;"><p style="font-size:0.75rem;color:#557755;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">Alternative Treffer</p>`;
+    alts.slice(1).forEach(a=>{
+      html+=`<div class="altItem"><span class="altName">${a.scientific_name}</span><span class="altConf">${a.confidence}%</span></div>`;
+    });
+    html+=`</div>`;
+  }
+
+  html+='</div>';
+
+  html+=`<div class="careAgentBox" id="careAgentBox">
+    <div class="careAgentHeader"><span class="icon">🤖</span><h3>Web-Agent: Pflegehinweise</h3></div>
+    <button class="careAgentBtn" id="careSearchBtn" onclick="searchCareTips()">🔍 Pflegehinweise im Web suchen</button>
+    <div id="careAgentSpinner" class="spinner" style="display:none;"></div>
+    <div id="careAgentContent" class="careAgentContent" style="display:none;"></div></div>`;
+
+  html+=`<div class="shareWrap">
+    <button class="shareBtn" id="shareBtn" onclick="toggleShare()">📤 Teilen</button>
+    <div class="shareDropdown" id="shareDropdown">
+      <button class="shareItem" onclick="shareResult('whatsapp')"><span class="ico">💬</span> WhatsApp</button>
+      <button class="shareItem" onclick="shareResult('telegram')"><span class="ico">✈️</span> Telegram</button>
+      <button class="shareItem" onclick="shareResult('gmail')"><span class="ico">📧</span> Gmail</button>
+      <button class="shareItem" onclick="shareResult('clipboard')"><span class="ico">📋</span> Zwischenablage</button>
+    </div></div>`;
+
+  const searchQ=encodeURIComponent(plantName+' Pflanze kaufen');
+  html+=`<div class="shopBar">
+    <a class="shopLink" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${searchQ}" target="_blank">🛒 Idealo</a>
+    <a class="shopLink" href="https://www.amazon.de/s?k=${searchQ}" target="_blank">📦 Amazon</a>
+    <a class="shopLink" href="https://www.ebay.de/sch/i.html?_nkw=${searchQ}" target="_blank">🏷️ eBay</a>
+  </div>`;
+
+  html+=`<div class="chatContainer">
+    <div class="chatHeader">🤖 Frag den Plant-Agenten</div>
+    <div class="chatHistory" id="chatHistory"></div>
+    <div class="chatInputRow">
+      <input type="text" class="chatInput" id="chatInput" placeholder="Frag zur Pflanze..." onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="chatSend" id="chatSend" onclick="sendChat()">➤</button>
+    </div></div>`;
+
+  $('resultContainer').innerHTML=html;
+  chatHistory=[];
+}
+
+function speakResult(d){
+  const best=(d.identification||{}).best_match||{};
+  const name=(best.common_names&&best.common_names[0])||best.scientific_name;
+  try{
+    const u=new SpeechSynthesisUtterance(`Erkannt: ${name}. Konfidenz ${best.confidence} Prozent.`);
+    u.lang='de-DE';u.rate=0.95;speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+async function searchCareTips(){
+  if(!currentAnalysisResult){showToast('Keine Analyse vorhanden.');return;}
+  const btn=$('careSearchBtn');const sp=$('careAgentSpinner');const ct=$('careAgentContent');
+  const plantName=(currentAnalysisResult.identification||{}).best_match||{};
+  const name=(plantName.common_names&&plantName.common_names[0])||plantName.scientific_name||'';
+  if(!name){showToast('Kein Pflanzenname gefunden.');return;}
+  btn.disabled=true;sp.style.display='block';ct.style.display='none';
+  try{
+    const r=await fetch('/plantid/api/search-care',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plant_name:name})});
+    const d=await r.json();
+    if(d.success){ct.innerHTML=d.markdown||d.html||d.text||'Keine Inhalte.';ct.style.display='block';}
+    else{showToast('Fehler: '+(d.error||'Unbekannt'));}
+  }catch(e){showToast('Netzwerkfehler: '+e.message);}
+  finally{btn.disabled=false;sp.style.display='none';}
+}
+
+function showToast(msg){
+  const t=$('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+function toggleShare(){
+  $('shareDropdown').classList.toggle('show');
+}
+
+function shareResult(type){
+  if(!currentAnalysisResult){showToast('Keine Analyse zum Teilen.');return;}
+  const best=(currentAnalysisResult.identification||{}).best_match||{};
+  const name=(best.common_names&&best.common_names[0])||best.scientific_name||'Unbekannt';
+  const text=`🌿 Plant-ID Ergebnis: ${name} (${best.confidence||0}% Konfidenz)`;
+  const url=window.location.href;
+  if(type==='whatsapp')window.open('https://wa.me/?text='+encodeURIComponent(text+' '+url),'_blank');
+  else if(type==='telegram')window.open('https://t.me/share/url?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(text),'_blank');
+  else if(type==='gmail')window.open('https://mail.google.com/mail/?view=cm&su='+encodeURIComponent('Plant-ID: '+name)+'&body='+encodeURIComponent(text+'\n'+url),'_blank');
+  else if(type==='clipboard'){navigator.clipboard.writeText(text+'\n'+url).then(()=>showToast('Kopiert!')).catch(()=>showToast('Kopieren fehlgeschlagen'));}
+  toggleShare();
+}
+
+async function sendChat(){
+  const inp=$('chatInput');const msg=inp.value.trim();if(!msg)return;
+  const hist=$('chatHistory');
+  const userDiv=document.createElement('div');userDiv.className='chatMsg user';userDiv.textContent=msg;hist.appendChild(userDiv);
+  hist.scrollTop=hist.scrollHeight;inp.value='';
+  const sendBtn=$('chatSend');sendBtn.disabled=true;
+  chatHistory.push({role:'user',content:msg});
+  try{
+    const r=await fetch('/plantid/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,plant_context:currentAnalysisResult||{},history:chatHistory})});
+    const d=await r.json();
+    const botDiv=document.createElement('div');botDiv.className='chatMsg '+(d.success?'bot':'error');
+    botDiv.textContent=d.success?(d.reply||'Keine Antwort.'):(d.error||'Fehler.');
+    hist.appendChild(botDiv);hist.scrollTop=hist.scrollHeight;
+    if(d.success)chatHistory.push({role:'assistant',content:d.reply});
+  }catch(e){
+    const errDiv=document.createElement('div');errDiv.className='chatMsg error';errDiv.textContent='Netzwerkfehler: '+e.message;
+    hist.appendChild(errDiv);hist.scrollTop=hist.scrollHeight;
+  }finally{sendBtn.disabled=false;}
+}
+
+function resetAll(){
+  capturedB64=null;currentAnalysisResult=null;chatHistory=[];
+  stopCamera();
+  $('dropZone').style.display='block';
+  $('analyzeBtn').style.display='none';
+  $('statusLine').textContent='Bereit – Kamera starten oder Foto hochladen';
+  $('resultContainer').innerHTML=`<div style="text-align:center;color:#557755;padding:50px 20px;"><div style="font-size:3rem;margin-bottom:12px;">🌿</div><p>Noch keine Analyse durchgeführt.<br>Wechsle zum Scanner!</p></div>`;
+  switchTab('scan');
+}
+
+function sendToBot(){
+  if(!currentAnalysisResult){showToast('Bitte zuerst eine Analyse durchführen!');return;}
+  if(tg){tg.sendData(JSON.stringify({action:'plantid_result',data:currentAnalysisResult}));tg.close();}
+  else{showToast('Nicht in Telegram WebApp.');}
+}
+</script>
+</body>
+</html>

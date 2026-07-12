@@ -1,0 +1,1829 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filip Makarczyk • Hybrid-Experte für KI-gestütztes Property Management</title>
+    <meta name="description" content="13+ Jahre Property Management + selbst gebaute KI-Systeme mit 25+ Modulen. Der Experte, der Prozesse in der Immobilienwirtschaft wirklich versteht und selbst automatisieren kann. Für Decision Maker in Asset &amp; Property Management.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Space+Grotesk:wght@500;600&amp;display=swap');
+        body { font-family: 'Inter', system_ui, sans-serif; }
+        .font-display { font-family: 'Space Grotesk', 'Inter', sans-serif; font-weight: 600; }
+        .glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
+        .section-header { font-size: 3rem; line-height: 1.05; font-weight: 700; letter-spacing: -0.03em; }
+        .nav-link { transition: all 0.2s cubic-bezier(0.4,0,0.2,1); }
+        .nav-link:hover { color: #7C3AED; transform: translateY(-1px); }
+        .skill-card, .use-case-card, .module-card, .expertise-card { transition: transform .4s cubic-bezier(0.34,1.56,.64,1), box-shadow .4s cubic-bezier(0.4,0,.2,1); }
+        .skill-card:hover, .use-case-card:hover, .module-card:hover, .expertise-card:hover { transform: translateY(-8px) scale(1.01); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+        .timeline-item { position: relative; }
+        .timeline-item::before { content: ''; position: absolute; left: 31px; top: 0; bottom: -50px; width: 4px; background: linear-gradient(to bottom, #7C3AED, #3B82F6); z-index: 0; }
+        .timeline-item:last-child::before { display: none; }
+        .timeline-dot { transition: all .4s cubic-bezier(0.34,1.56,.64,1); box-shadow: 0 0 0 8px rgba(124,58,237,.15); }
+        .timeline-item:hover .timeline-dot { transform: scale(1.2); box-shadow: 0 0 0 12px rgba(124,58,237,.2); }
+        .use-case-card { border-left: 5px solid #7C3AED; }
+        #map { border-radius: 20px; box-shadow: 0 10px 15px -3px rgb(0 0 0 / .1); }
+        .bot-inspired { background: linear-gradient(135deg, #1a1433 0%, #0f172a 100%); }
+        .chat-popup { box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.4); animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .chat-message { max-width: 85%; padding: 12px 16px; border-radius: 18px; margin-bottom: 8px; line-height: 1.4; }
+        .chat-user { background: #7C3AED; color: white; border-bottom-right-radius: 6px; }
+        .chat-bot { background: #334155; color: #e2e8f0; border-bottom-left-radius: 6px; }
+        .cv-modal { animation: fadeInScale 0.3s ease-out; }
+        @keyframes fadeInScale { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* ===== SCROLL REVEAL ===== */
+        .reveal { opacity: 0; transform: translateY(46px); transition: opacity .9s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1); transition-delay: var(--rd, 0ms); will-change: transform, opacity; }
+        .reveal.in-view { opacity: 1; transform: translateY(0); }
+        .reveal-left { opacity: 0; transform: translateX(-50px); transition: opacity .9s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1); }
+        .reveal-left.in-view { opacity: 1; transform: translateX(0); }
+        .reveal-right { opacity: 0; transform: translateX(50px); transition: opacity .9s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1); }
+        .reveal-right.in-view { opacity: 1; transform: translateX(0); }
+        .reveal-scale { opacity: 0; transform: scale(.92); transition: opacity .8s cubic-bezier(.16,1,.3,1), transform .8s cubic-bezier(.16,1,.3,1); transition-delay: var(--rd, 0ms); }
+        .reveal-scale.in-view { opacity: 1; transform: scale(1); }
+        @media (prefers-reduced-motion: reduce) {
+            .reveal, .reveal-left, .reveal-right, .reveal-scale { opacity: 1 !important; transform: none !important; transition: none !important; }
+        }
+
+        /* ===== HERO ENTRANCE + PARALLAX ===== */
+        @keyframes heroUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
+        .hero-anim { opacity: 0; animation: heroUp .9s cubic-bezier(.16,1,.3,1) forwards; }
+        .hero-anim-1 { animation-delay: .05s; }
+        .hero-anim-2 { animation-delay: .18s; }
+        .hero-anim-3 { animation-delay: .32s; }
+        .hero-anim-4 { animation-delay: .46s; }
+        .hero-anim-5 { animation-delay: .58s; }
+        .parallax-orb { position: absolute; border-radius: 9999px; pointer-events: none; will-change: transform; animation: orbPulse 9s ease-in-out infinite; }
+        @keyframes orbPulse { 0%, 100% { opacity: .55; } 50% { opacity: .9; } }
+        .grain-overlay { position: absolute; inset: 0; pointer-events: none; opacity: .035; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); mix-blend-mode: overlay; }
+
+        /* ===== MICRO INTERACTIONS ===== */
+        .magnetic-btn { transition: transform .35s cubic-bezier(.34,1.56,.64,1), box-shadow .35s ease; }
+        .magnetic-btn:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -10px rgba(124,58,237,.45); }
+        .gradient-text-shift { background: linear-gradient(90deg,#a78bfa,#60a5fa,#34d399,#a78bfa); background-size: 300% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: gradShift 6s linear infinite; }
+        @keyframes gradShift { to { background-position: 300% center; } }
+        .stat-counter { font-variant-numeric: tabular-nums; }
+        .testimonial-card { border-top: 3px solid transparent; border-image: linear-gradient(90deg,#7C3AED,#3B82F6) 1; transition: transform .4s cubic-bezier(.34,1.56,.64,1), box-shadow .4s ease; }
+        .testimonial-card:hover { transform: translateY(-6px); box-shadow: 0 20px 35px -12px rgba(0,0,0,.35); }
+        .quote-mark { font-family: 'Space Grotesk', serif; opacity: .25; line-height: 0; }
+
+        /* ===== WORKSPACE / LIVE-EDIT MODE ===== */
+        body.workspace-active { cursor: default; }
+        .ws-item { outline: 1.5px dashed transparent; outline-offset: 3px; transition: outline-color .2s ease; position: relative; }
+        body.workspace-active .ws-item { outline-color: rgba(124,58,237,.35); cursor: grab; }
+        body.workspace-active .ws-item:hover { outline-color: rgba(124,58,237,.85); }
+        .ws-item.ws-dragging { cursor: grabbing !important; outline-color: #22c55e !important; outline-style: solid; z-index: 80 !important; }
+        .ws-resize-handle { display: none; position: absolute; bottom: -6px; right: -6px; width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg,#7C3AED,#3B82F6); align-items: center; justify-content: center; color: #fff; font-size: 10px; cursor: nwse-resize; z-index: 90; box-shadow: 0 4px 10px rgba(0,0,0,.4); }
+        body.workspace-active .ws-item:hover .ws-resize-handle { display: flex; }
+        .ws-editable-text:focus { outline: 2px solid #22c55e; outline-offset: 2px; border-radius: 6px; background: rgba(34,197,94,.08); cursor: text; }
+        #workspace-banner { animation: slideUp .3s ease-out; }
+        .ws-toggle-active { background: linear-gradient(135deg,#7C3AED,#3B82F6) !important; border-color: transparent !important; color: #fff !important; }
+
+        /* ===== PROJECT CARDS ===== */
+        .project-card { transition: transform .4s cubic-bezier(0.34,1.56,.64,1), box-shadow .4s ease, border-color .3s ease; cursor: pointer; }
+        .project-card:hover { transform: translateY(-6px); box-shadow: 0 20px 30px -10px rgba(124,58,237,.25); border-color: rgba(124,58,237,.5); }
+        .project-card .proj-icon { transition: transform .4s cubic-bezier(.34,1.56,.64,1); }
+        .project-card:hover .proj-icon { transform: scale(1.12) rotate(-4deg); }
+
+        /* ===== ROI CALCULATOR ===== */
+        .roi-slider { -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: linear-gradient(90deg,#7C3AED,#3B82F6); outline: none; }
+        .roi-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 4px solid #7C3AED; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+        .roi-slider::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #fff; border: 4px solid #7C3AED; cursor: pointer; }
+        .roi-result-number { font-variant-numeric: tabular-nums; transition: all .3s ease; }
+
+        /* ===== FAQ ACCORDION ===== */
+        .faq-item { cursor: pointer; }
+        .faq-answer { max-height: 0; overflow: hidden; transition: max-height .4s cubic-bezier(.4,0,.2,1), opacity .3s ease, margin-top .3s ease; opacity: 0; }
+        .faq-item.open .faq-answer { opacity: 1; margin-top: .75rem; }
+        .faq-chevron { transition: transform .35s cubic-bezier(.4,0,.2,1); }
+        .faq-item.open .faq-chevron { transform: rotate(180deg); }
+
+        /* ===== COMPARISON TABLE ===== */
+        .compare-row > div { transition: background-color .25s ease; }
+        .compare-highlight { background: linear-gradient(90deg, rgba(124,58,237,.12), rgba(59,130,246,.08)); }
+
+        /* ===== URL POPUP MODAL ===== */
+        .url-modal { animation: fadeInScale 0.25s ease-out; }
+
+        /* ===== COMPANY LOGO BADGES ===== */
+        .company-logo-badge { width: 3rem; height: 3rem; border-radius: 1rem; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 4px 14px rgba(0,0,0,.25); transition: transform .4s cubic-bezier(.34,1.56,.64,1); }
+        .testimonial-card:hover .company-logo-badge, .timeline-item:hover .company-logo-badge { transform: scale(1.08) rotate(-3deg); }
+        .company-logo-badge img { width: 100%; height: 100%; object-fit: contain; padding: 6px; }
+        .company-blurb { border-top: 1px solid rgba(255,255,255,.08); margin-top: 1.25rem; padding-top: 1rem; }
+
+        /* ===== ZITATE / QUOTES SECTION ===== */
+        .quote-hero-card { position: relative; background: linear-gradient(155deg, rgba(124,58,237,.16), rgba(15,23,42,.4)); border: 1px solid rgba(124,58,237,.35); overflow: hidden; }
+        .quote-hero-card::before { content: '\201C'; position: absolute; top: -30px; left: 10px; font-family: 'Space Grotesk', serif; font-size: 220px; font-weight: 600; color: rgba(124,58,237,.18); line-height: 1; pointer-events: none; }
+        .quote-card { transition: transform .4s cubic-bezier(.34,1.56,.64,1), box-shadow .4s ease, border-color .3s ease; }
+        .quote-card:hover { transform: translateY(-6px); border-color: rgba(124,58,237,.5); box-shadow: 0 20px 35px -14px rgba(124,58,237,.35); }
+        .quote-number { font-family: 'Space Grotesk', sans-serif; font-weight: 600; background: linear-gradient(135deg,#a78bfa,#60a5fa); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        @keyframes quoteFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        .quote-icon-float { animation: quoteFloat 4.5s ease-in-out infinite; }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 dark">
+
+    <!-- NAVBAR -->
+    <nav id="navbar" class="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-slate-950/90 backdrop-blur-xl border-b border-white/10">
+        <div class="max-w-screen-2xl mx-auto px-8">
+            <div class="flex items-center justify-between h-20">
+                <div class="flex items-center gap-x-3">
+                    <div class="w-11 h-11 rounded-3xl bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center">
+                        <span class="text-white font-bold text-3xl tracking-tighter">FM</span>
+                    </div>
+                    <div>
+                        <div class="font-display text-3xl font-semibold tracking-tighter">Filip Makarczyk</div>
+                        <div class="text-[10px] text-slate-400 -mt-1.5 tracking-[2px]">HYBRID EXPERT</div>
+                    </div>
+                </div>
+
+                <div class="hidden xl:flex items-center gap-x-6 text-sm font-medium">
+                    <a href="#skills" class="nav-link underline-grow text-slate-300 hover:text-white">Skills</a>
+                    <a href="#expertise" class="nav-link underline-grow text-slate-300 hover:text-white">Expertise</a>
+                    <a href="#value" class="nav-link underline-grow text-slate-300 hover:text-white">Impact</a>
+                    <a href="#roi" class="nav-link underline-grow text-slate-300 hover:text-white">ROI-Rechner</a>
+                    <a href="#fiverr-prasentationen" class="nav-link underline-grow text-slate-300 hover:text-white">Präsentationen</a>
+                    <a href="#projekte" class="nav-link underline-grow text-slate-300 hover:text-white">Projekte</a>
+                    <a href="#zitate" class="nav-link underline-grow text-slate-300 hover:text-white">Zitate</a>
+                    <a href="#standorte" class="nav-link underline-grow text-slate-300 hover:text-white">Standorte</a>
+                    <a href="#faq" class="nav-link underline-grow text-slate-300 hover:text-white">FAQ</a>
+                </div>
+
+                <div class="flex items-center gap-x-3">
+                    <a href="https://www.linkedin.com/in/filip-makarczyk-aa512813b" target="_blank" rel="noopener" title="LinkedIn-Profil" class="w-11 h-11 flex items-center justify-center rounded-3xl bg-[#0A66C2]/15 border border-[#0A66C2]/40 text-[#4d9fef] hover:bg-[#0A66C2]/30 hover:text-white transition-all magnetic-btn">
+                        <i class="fa-brands fa-linkedin-in text-lg"></i>
+                    </a>
+                    <a href="https://www.xing.com/profile/Filip_Makarczyk/web_profiles?nwt_nav=profile" target="_blank" rel="noopener" title="Xing-Profil" class="w-11 h-11 flex items-center justify-center rounded-3xl bg-[#006567]/25 border border-[#00857c]/40 text-[#2fd6c4] hover:bg-[#00857c]/40 hover:text-white transition-all magnetic-btn">
+                        <i class="fa-brands fa-xing text-lg"></i>
+                    </a>
+                    <button onclick="showCVModal()" class="px-5 py-2 text-sm font-medium rounded-3xl border border-white/20 hover:bg-white/5 transition-all flex items-center gap-x-2">
+                        <i class="fa-solid fa-file-lines"></i>
+                        <span>Lebenslauf</span>
+                    </button>
+                    
+                    <div class="flex items-center bg-slate-900 border border-white/10 rounded-3xl p-1 text-xs">
+                        <button onclick="switchLanguage('de')" id="lang-de" class="px-5 py-1.5 rounded-3xl font-medium bg-white text-slate-950">DE</button>
+                        <button onclick="switchLanguage('en')" id="lang-en" class="px-5 py-1.5 rounded-3xl font-medium text-slate-400 hover:text-white">EN</button>
+                    </div>
+                    
+                    <button onclick="toggleTheme()" class="w-11 h-11 flex items-center justify-center rounded-3xl bg-slate-900 border border-white/10 hover:bg-slate-800 transition-colors">
+                        <i class="fa-solid fa-moon text-lg" id="theme-icon"></i>
+                    </button>
+
+                    <button onclick="toggleWorkspaceMode()" id="workspace-toggle-btn" title="Workspace-Modus: Elemente live verschieben, skalieren &amp; Text bearbeiten" class="w-11 h-11 flex items-center justify-center rounded-3xl bg-slate-900 border border-white/10 hover:bg-slate-800 transition-colors">
+                        <i class="fa-solid fa-arrows-up-down-left-right text-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- WORKSPACE MODE BANNER -->
+    <div id="workspace-banner" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] glass border border-violet-500/40 rounded-3xl px-6 py-3.5 flex items-center gap-x-4 shadow-2xl bg-slate-900/95">
+        <i class="fa-solid fa-pen-ruler text-violet-400"></i>
+        <span class="text-sm text-slate-200"><strong class="text-white">Workspace-Modus aktiv</strong> — Elemente ziehen, an der Ecke skalieren, Text anklicken &amp; bearbeiten.</span>
+        <button onclick="location.reload()" class="text-xs px-4 py-1.5 rounded-3xl border border-white/20 hover:bg-white/10 transition-colors whitespace-nowrap">Zurücksetzen</button>
+        <button onclick="toggleWorkspaceMode()" class="text-xs px-4 py-1.5 rounded-3xl bg-white text-slate-950 font-medium hover:bg-white/90 transition-colors whitespace-nowrap">Beenden</button>
+    </div>
+
+    <!-- HERO -->
+    <section class="min-h-[100dvh] flex items-center pt-20 relative overflow-hidden bot-inspired">
+        <div class="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+            <div class="parallax-orb w-[560px] h-[560px] bg-violet-600/25 blur-[110px]" style="top:-15%; left:-10%;" data-speed="0.18"></div>
+            <div class="parallax-orb w-[460px] h-[460px] bg-blue-600/20 blur-[100px]" style="top:25%; right:-8%;" data-speed="0.32"></div>
+            <div class="parallax-orb w-[380px] h-[380px] bg-emerald-500/10 blur-[90px]" style="bottom:-10%; left:30%;" data-speed="0.22"></div>
+            <div class="grain-overlay"></div>
+        </div>
+        <div class="max-w-screen-2xl mx-auto px-8 relative z-10">
+            <div class="max-w-5xl">
+                <div class="hero-anim hero-anim-1 inline-flex items-center gap-x-2 px-5 py-2 rounded-3xl bg-white/5 border border-white/10 mb-8">
+                    <div class="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse"></div>
+                    <span class="text-sm font-medium tracking-wider text-emerald-400">BUNDESWEIT + INTERNATIONAL VERFÜGBAR</span>
+                </div>
+                
+                <h1 class="hero-anim hero-anim-2 section-header text-7xl md:text-8xl leading-[0.92] tracking-tighter mb-8">
+                    Der Property Manager,<br>
+                    der selbst <span class="gradient-text-shift">KI-Systeme</span> baut.
+                </h1>
+                
+                <p class="hero-anim hero-anim-3 max-w-2xl text-2xl text-slate-300 mb-10 leading-tight">
+                    13+ Jahre operative und führende Erfahrung in der Immobilienwirtschaft – von der kaufmännischen und technischen Objektverwaltung über Teamleitung bis hin zu internationalen Logistikmandaten.<br><br>
+                    Gleichzeitig selbst aufgebautes, produktionsreifes KI-Ökosystem mit über 25 Modulen, das Prozesse skalierbar und effizienter macht.
+                </p>
+
+                <div class="hero-anim hero-anim-4 flex flex-wrap gap-4 mb-16">
+                    <a href="#contact" class="magnetic-btn inline-flex items-center justify-center gap-x-3 px-10 h-16 rounded-3xl bg-white text-slate-950 font-semibold text-lg hover:bg-white/90 active:scale-[0.985] transition-all">
+                        <span>Kontakt aufnehmen</span>
+                    </a>
+                    <a href="#expertise" class="magnetic-btn inline-flex items-center justify-center gap-x-3 px-10 h-16 rounded-3xl border border-white/20 hover:bg-white/5 font-medium text-lg transition-all">
+                        <span>Meine Expertise im Detail</span>
+                    </a>
+                    <a href="https://www.linkedin.com/in/filip-makarczyk-aa512813b" target="_blank" rel="noopener" class="magnetic-btn inline-flex items-center justify-center gap-x-3 px-8 h-16 rounded-3xl bg-[#0A66C2] text-white font-medium text-lg hover:bg-[#0A66C2]/85 transition-all">
+                        <i class="fa-brands fa-linkedin-in text-xl"></i>
+                        <span>LinkedIn</span>
+                    </a>
+                    <a href="https://www.xing.com/profile/Filip_Makarczyk/web_profiles?nwt_nav=profile" target="_blank" rel="noopener" class="magnetic-btn inline-flex items-center justify-center gap-x-3 px-8 h-16 rounded-3xl bg-[#00857c] text-white font-medium text-lg hover:bg-[#00857c]/85 transition-all">
+                        <i class="fa-brands fa-xing text-xl"></i>
+                        <span>Xing</span>
+                    </a>
+                </div>
+
+                <div class="hero-anim hero-anim-5 flex items-center gap-x-10 text-sm">
+                    <div><span class="text-emerald-400 font-semibold text-3xl stat-counter" data-count-to="13" data-suffix="+">0</span><br><span class="text-slate-400">Jahre Erfahrung</span></div>
+                    <div><span class="text-emerald-400 font-semibold text-3xl stat-counter" data-count-to="25" data-suffix="+">0</span><br><span class="text-slate-400">KI-Module</span></div>
+                    <div><span class="text-emerald-400 font-semibold text-3xl">Teamleiter</span><br><span class="text-slate-400">Führungserfahrung</span></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- POSITIONING -->
+    <section class="max-w-screen-2xl mx-auto px-8 py-16 border-b border-white/10">
+        <div class="reveal max-w-4xl mx-auto text-center">
+            <p class="text-2xl leading-tight text-slate-200">
+                Ich bin kein klassischer Property Manager.<br>
+                Und ich bin auch kein reiner Softwareentwickler.<br><br>
+                <span class="font-semibold text-white">Ich bin die Schnittstelle dazwischen:</span><br>
+                Jemand, der die Immobilienwirtschaft aus über 13 Jahren operativer und führender Erfahrung wirklich versteht – und gleichzeitig selbst die KI-Systeme baut, die diese Prozesse skalierbar und effizienter machen.
+            </p>
+        </div>
+    </section>
+
+    <!-- SKILLS -->
+    <section id="skills" class="max-w-screen-2xl mx-auto px-8 py-20">
+        <div class="reveal max-w-4xl mb-12">
+            <div class="text-violet-400 text-xs tracking-[3px] font-semibold mb-3">TECHNISCHE KOMPETENZ AUF SENIOR-NIVEAU</div>
+            <h2 class="section-header text-6xl tracking-tighter">Ich habe von Grund auf ein produktionsreifes KI-System gebaut</h2>
+            <p class="mt-5 text-xl text-slate-300">
+                Kein kleines Skript. Kein „etwas Python gelernt“. Sondern ein vollständiges, modulares, produktionsreifes Multi-Modul-System mit über 25 Komponenten – entwickelt und betrieben ohne formale IT-Ausbildung. Das System umfasst Multi-Agent-Orchestrierung, Voice-Cloning, generative Medien, sichere Code-Sandboxes, RAG-basierte Wissenssysteme und robuste Cloud-Architekturen.
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="reveal-scale skill-card glass rounded-3xl p-8 border border-white/10" style="--rd:0ms">
+                <div class="flex items-center gap-x-4 mb-5">
+                    <div class="w-12 h-12 rounded-2xl bg-violet-600/20 flex items-center justify-center text-violet-400"><i class="fa-solid fa-robot text-3xl"></i></div>
+                    <div><div class="font-semibold text-xl">Multi-Agent Orchestration</div><div class="text-xs text-violet-400">SENIOR</div></div>
+                </div>
+                <p class="text-slate-300">Vollständiges Multi-Agent-System mit Tool-Calling, JSON-Schema und strukturierter Ausführung. Ermöglicht die Automatisierung komplexer, mehrstufiger Workflows in der Immobilienwirtschaft – von Reporting über Due Diligence bis hin zu Mieterkommunikation.</p>
+            </div>
+
+            <div class="reveal-scale skill-card glass rounded-3xl p-8 border border-white/10" style="--rd:60ms">
+                <div class="flex items-center gap-x-4 mb-5">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-600/20 flex items-center justify-center text-blue-400"><i class="fa-solid fa-microphone-lines text-3xl"></i></div>
+                    <div><div class="font-semibold text-xl">Voice AI Pipeline</div><div class="text-xs text-blue-400">ADVANCED</div></div>
+                </div>
+                <p class="text-slate-300">Produktionsreife Sprach-KI mit Voice Cloning und Echtzeit-Streaming. Ermöglicht 24/7 Mieterkommunikation in der eigenen Unternehmensstimme bei gleichzeitiger Entlastung des operativen Teams.</p>
+            </div>
+
+            <div class="reveal-scale skill-card glass rounded-3xl p-8 border border-white/10" style="--rd:120ms">
+                <div class="flex items-center gap-x-4 mb-5">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-600/20 flex items-center justify-center text-emerald-400"><i class="fa-solid fa-video text-3xl"></i></div>
+                    <div><div class="font-semibold text-xl">Generative Media System</div><div class="text-xs text-emerald-400">ADVANCED</div></div>
+                </div>
+                <p class="text-slate-300">FLUX.1, Text-to-Video, Image-to-Video und KI-Musik. Ermöglicht schnelle und kostengünstige Erstellung von Marketing-Content, virtuellen Präsentationen und 3D-Modellen.</p>
+            </div>
+
+            <div class="reveal-scale skill-card glass rounded-3xl p-8 border border-white/10" style="--rd:0ms">
+                <div class="flex items-center gap-x-4 mb-5">
+                    <div class="w-12 h-12 rounded-2xl bg-amber-600/20 flex items-center justify-center text-amber-400"><i class="fa-solid fa-terminal text-3xl"></i></div>
+                    <div><div class="font-semibold text-xl">Secure Code Sandbox V8</div><div class="text-xs text-amber-400">SENIOR</div></div>
+                </div>
+                <p class="text-slate-300">Eigene sichere Code-Execution-Umgebung mit AST-Parser, Live HTML-Preview und direkter Brain-Integration. Ermöglicht auch Nicht-Programmierern im Team, komplexe Auswertungen und Automatisierungen selbst durchzuführen.</p>
+            </div>
+
+            <div class="reveal-scale skill-card glass rounded-3xl p-8 border border-white/10" style="--rd:60ms">
+                <div class="flex items-center gap-x-4 mb-5">
+                    <div class="w-12 h-12 rounded-2xl bg-pink-600/20 flex items-center justify-center text-pink-400"><i class="fa-solid fa-database text-3xl"></i></div>
+                    <div><div class="font-semibold text-xl">RAG Brain System</div><div class="text-xs text-pink-400">ADVANCED</div></div>
+                </div>
+                <p class="text-slate-300">Semantische Vektorsuche über alle Verträge, Berichte und Dokumente mit Metadaten. Ermöglicht extrem schnelle und präzise Recherche sowie bessere Entscheidungsgrundlagen.</p>
+            </div>
+
+            <div class="reveal-scale skill-card glass rounded-3xl p-8 border border-white/10" style="--rd:120ms">
+                <div class="flex items-center gap-x-4 mb-5">
+                    <div class="w-12 h-12 rounded-2xl bg-sky-600/20 flex items-center justify-center text-sky-400"><i class="fa-solid fa-cloud text-3xl"></i></div>
+                    <div><div class="font-semibold text-xl">Cloud Deployment</div><div class="text-xs text-sky-400">ADVANCED</div></div>
+                </div>
+                <p class="text-slate-300">Robuste Always-On Architektur mit Webhook-Watchdog und Offset-Persistenz. Ermöglicht den stabilen Betrieb interner KI-Tools ohne große Infrastruktur-Kosten.</p>
+            </div>
+
+            <div class="reveal-scale skill-card glass rounded-3xl p-8 border border-white/10" style="--rd:0ms">
+                <div class="flex items-center gap-x-4 mb-5">
+                    <div class="w-12 h-12 rounded-2xl bg-rose-600/20 flex items-center justify-center text-rose-400"><i class="fa-solid fa-chart-line text-3xl"></i></div>
+                    <div><div class="font-semibold text-xl">Echtzeit-Kostenoptimierung &amp; Prognosen</div><div class="text-xs text-rose-400">SENIOR</div></div>
+                </div>
+                <p class="text-slate-300">Live-Modelle für Betriebs- und Bewirtschaftungskosten mit spielerisch bedienbaren Szenario-Reglern – Entscheider sehen Auswirkungen von Annahmen sofort, statt auf den nächsten Quartalsbericht zu warten. Direkt nutzbar für Investoren-Calls und Vorstandsrunden.</p>
+            </div>
+
+            <div class="reveal-scale skill-card glass rounded-3xl p-8 border border-white/10" style="--rd:60ms">
+                <div class="flex items-center gap-x-4 mb-5">
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-600/20 flex items-center justify-center text-indigo-400"><i class="fa-solid fa-diagram-project text-3xl"></i></div>
+                    <div><div class="font-semibold text-xl">Entscheidungsvorlagen &amp; Workflow-Automation</div><div class="text-xs text-indigo-400">ADVANCED</div></div>
+                </div>
+                <p class="text-slate-300">Aus Rohdaten werden automatisch strukturierte Entscheidungsvorlagen inkl. Optionen, Risiken und Empfehlung generiert – eingebettet in wiederholbare Workflows, die ohne manuellen Aufwand laufen, sobald sie einmal definiert sind.</p>
+            </div>
+
+            <div class="reveal-scale skill-card glass rounded-3xl p-8 border border-white/10" style="--rd:120ms">
+                <div class="flex items-center gap-x-4 mb-5">
+                    <div class="w-12 h-12 rounded-2xl bg-teal-600/20 flex items-center justify-center text-teal-400"><i class="fa-solid fa-bolt-lightning text-3xl"></i></div>
+                    <div><div class="font-semibold text-xl">Early-Adopter-Mindset</div><div class="text-xs text-teal-400">SIGNATURE</div></div>
+                </div>
+                <p class="text-slate-300">Neue Modelle, APIs und Frameworks werden innerhalb weniger Tage nach Release evaluiert und produktiv integriert – nicht erst, wenn sie zum Branchenstandard geworden sind. Das verschafft einen echten Zeit- und Wissensvorsprung.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- EXPERTISE SECTION (NEW - DETAILED) -->
+    <section id="expertise" class="max-w-screen-2xl mx-auto px-8 py-20 bg-slate-900 border-y border-white/10">
+        <div class="reveal max-w-4xl mb-12">
+            <div class="text-violet-400 text-xs tracking-[3px] font-semibold mb-3">OPERATIVE &amp; STRATEGISCHE EXPERTISE</div>
+            <h2 class="section-header text-6xl tracking-tighter">Meine Kernkompetenzen im Property Management</h2>
+            <p class="mt-5 text-xl text-slate-300">
+                Aus über 13 Jahren operativer und führender Tätigkeit in der Immobilienwirtschaft – von der kaufmännischen und technischen Objektverwaltung über Teamleitung bis hin zu internationalen Logistikmandaten – habe ich ein sehr breites und tiefes Verständnis für das Tagesgeschäft entwickelt. Die folgenden Bewertungen basieren auf den sehr positiven Rückmeldungen in meinen Arbeitszeugnissen.
+            </p>
+        </div>
+
+        <div class="max-w-5xl mx-auto">
+            <div class="grid md:grid-cols-2 gap-6">
+                
+                <div class="expertise-card glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="font-semibold text-xl">Teamleitung &amp; Mitarbeiterführung</div>
+                        <span class="text-emerald-400 font-bold text-2xl">9.5/10</span>
+                    </div>
+                    <p class="text-slate-300">Fachliche und disziplinarische Führung von Property-Management-Teams, inklusive Zielvereinbarungen, Mitarbeitergesprächen, Einarbeitung neuer Kollegen und Aufbau von Teamstrukturen. Besonders hervorgehoben in den Zeugnissen: hohe soziale Kompetenz, Motivationsfähigkeit und Belastbarkeit in herausfordernden Situationen.</p>
+                </div>
+
+                <div class="expertise-card glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="font-semibold text-xl">Operatives Property Management (Gewerbe &amp; Wohnen)</div>
+                        <span class="text-emerald-400 font-bold text-2xl">9/10</span>
+                    </div>
+                    <p class="text-slate-300">Umfassende kaufmännische und technische Verwaltung von Gewerbe-, Logistik- und Wohnimmobilien. Von der Vermietung und Übergabe über die Durchführung von Sanierungen bis hin zur laufenden Bewirtschaftung und Mieterbetreuung. Sehr starke operative Verankerung über viele Jahre.</p>
+                </div>
+
+                <div class="expertise-card glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="font-semibold text-xl">Due Diligence &amp; Ankaufsprozesse</div>
+                        <span class="text-emerald-400 font-bold text-2xl">9/10</span>
+                    </div>
+                    <p class="text-slate-300">Sichtung und Prüfung von Objektunterlagen, Erstellung von Kaufempfehlungen, Aufbau von Abrechnungsstrukturen in neuen Objekten und Begleitung von Immobilienkäufen. Besonders stark in der Identifikation von Einsparpotenzialen und der schnellen Integration neuer Mandate.</p>
+                </div>
+
+                <div class="expertise-card glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="font-semibold text-xl">Reporting, Controlling &amp; ESG</div>
+                        <span class="text-emerald-400 font-bold text-2xl">9/10</span>
+                    </div>
+                    <p class="text-slate-300">Monatliches und quartalsweises Reporting an Eigentümer und Geschäftsführung, Budgetierung, Kostencontrolling, ESG-Reporting und Unterstützung bei DGNB-Zertifizierungen. Sehr hohe Datenqualität und Prozesssicherheit.</p>
+                </div>
+
+                <div class="expertise-card glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="font-semibold text-xl">System-Know-how (SAP, IX-Haus, YARDI)</div>
+                        <span class="text-emerald-400 font-bold text-2xl">9.5/10</span>
+                    </div>
+                    <p class="text-slate-300">Key-User für SAP und IX-Haus, umfassende Erfahrung mit YARDI und anderen Verwaltungssystemen. Schnelle Einarbeitung in neue Systeme und Aufbau von Abrechnungsstrukturen. Besonders hervorgehoben in mehreren Zeugnissen.</p>
+                </div>
+
+                <div class="expertise-card glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="font-semibold text-xl">Internationale Projekte &amp; Kommunikation</div>
+                        <span class="text-emerald-400 font-bold text-2xl">9/10</span>
+                    </div>
+                    <p class="text-slate-300">Persönliche Objektübergaben und Betreuung von Logistikimmobilien in Polen, Kommunikation mit internationalen Partnern auf Polnisch und Englisch sowie Aufbau von Strukturen in fremden Wirtschafts- und Steuersystemen.</p>
+                </div>
+
+                <div class="expertise-card glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="font-semibold text-xl">Mieter- &amp; Eigentümerkommunikation</div>
+                        <span class="text-emerald-400 font-bold text-2xl">9/10</span>
+                    </div>
+                    <p class="text-slate-300">Ständiger Ansprechpartner für Mieter, Eigentümer und externe Dienstleister. Sehr hohe Zuverlässigkeit und Lösungsorientierung in der täglichen Kommunikation – durchgängig positiv in allen Zeugnissen bewertet.</p>
+                </div>
+
+                <div class="expertise-card glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="font-semibold text-xl">Projektmanagement &amp; Sanierungen</div>
+                        <span class="text-emerald-400 font-bold text-2xl">8.5/10</span>
+                    </div>
+                    <p class="text-slate-300">Begleitung und Leitung von Teil- und Vollsanierungen als Bauleiter, Abwicklung von Versicherungsschäden und Koordination externer Dienstleister. Starke praktische Umsetzungskompetenz.</p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- VALUE SECTION -->
+    <section id="value" class="max-w-screen-2xl mx-auto px-8 py-20">
+        <div class="reveal max-w-4xl mb-12">
+            <div class="text-blue-400 text-xs tracking-[3px] font-semibold mb-3">KONKRETER BUSINESS IMPACT</div>
+            <h2 class="section-header text-6xl tracking-tighter">Was diese Fähigkeiten Ihrem Unternehmen wirklich bringen</h2>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="use-case-card glass rounded-3xl p-8 border border-white/10">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="font-semibold text-2xl">1. Automatisiertes monatliches Reporting</div>
+                    <span class="text-emerald-400 font-bold text-xl">70–85%</span>
+                </div>
+                <p class="text-slate-300 mb-4">Statt dass Property Manager und Teamleiter mehrere Tage pro Monat mit der manuellen Zusammenstellung von Reports verbringen, übernimmt ein Agent diese Aufgabe weitgehend autonom.</p>
+                <div class="text-sm text-slate-300">
+                    <strong>Was das für Ihr Unternehmen bedeutet:</strong><br>
+                    Deutlich höhere Datenqualität und Konsistenz • Schnellere Verfügbarkeit für Investoren und Asset Manager • Entlastung qualifizierter Mitarbeiter bei repetitiven Tätigkeiten • Mehr Kapazität für strategische und wertschöpfende Aufgaben.
+                </div>
+            </div>
+
+            <div class="use-case-card glass rounded-3xl p-8 border border-white/10">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="font-semibold text-2xl">2. Semantische Suche in Verträgen &amp; Datenräumen</div>
+                    <span class="text-emerald-400 font-bold text-xl">60–80%</span>
+                </div>
+                <p class="text-slate-300 mb-4">Statt stunden- oder tagelang manuell durch Verträge und Datenräume zu suchen, liefert ein semantisches System sofort die relevanten Dokumente mit strukturierter Zusammenfassung.</p>
+                <div class="text-sm text-slate-300">
+                    <strong>Was das für Ihr Unternehmen bedeutet:</strong><br>
+                    Schnellere und fundiertere Entscheidungen bei Ankauf und Bewirtschaftung • Deutlich geringeres Risiko, wichtige Klauseln zu übersehen • Bessere und schnellere Vorbereitung von Investorengesprächen und Entscheidungsvorlagen.
+                </div>
+            </div>
+
+            <div class="use-case-card glass rounded-3xl p-8 border border-white/10">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="font-semibold text-2xl">3. 24/7 Mieter-Voice-Assistent</div>
+                    <span class="text-emerald-400 font-bold text-xl">40–60%</span>
+                </div>
+                <p class="text-slate-300 mb-4">Mieter können rund um die Uhr mit einem Sprachassistenten in der Stimme des Teams kommunizieren. Viele Standardanfragen werden selbstständig erfasst und gelöst.</p>
+                <div class="text-sm text-slate-300">
+                    <strong>Was das für Ihr Unternehmen bedeutet:</strong><br>
+                    Spürbare Entlastung des operativen Teams bei Routineanfragen • Höhere Erreichbarkeit und Servicequalität für Mieter • Bessere Skalierbarkeit bei wachsendem oder dezentralem Portfolio.
+                </div>
+            </div>
+
+            <div class="use-case-card glass rounded-3xl p-8 border border-white/10">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="font-semibold text-2xl">4. Automatische Erstellung von Marketing-Content</div>
+                    <span class="text-emerald-400 font-bold text-xl">75–90%</span>
+                </div>
+                <p class="text-slate-300 mb-4">Neue Objekte oder Kampagnen → Automatisch Reels, Exposé-Texte, Social-Media-Posts und strukturierte Inhalte generieren.</p>
+                <div class="text-sm text-slate-300">
+                    <strong>Was das für Ihr Unternehmen bedeutet:</strong><br>
+                    Deutlich schnellere Vermarktung von Objekten • Höhere Frequenz und Konsistenz in der Außenkommunikation • Weniger Abhängigkeit von externen Agenturen bei Standard-Content.
+                </div>
+            </div>
+
+            <!-- 5th Use Case -->
+            <div class="use-case-card glass rounded-3xl p-8 border border-white/10">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="font-semibold text-2xl">5. KI-gestützte Due Diligence &amp; Dokumentenanalyse</div>
+                    <span class="text-emerald-400 font-bold text-xl">65–85%</span>
+                </div>
+                <p class="text-slate-300 mb-4">Automatische Extraktion, Zusammenfassung und Risiko-Identifikation aus Kaufverträgen, Mietverträgen, Protokollen und Datenräumen mittels RAG und strukturierter Agenten-Workflows.</p>
+                <div class="text-sm text-slate-300">
+                    <strong>Was das für Ihr Unternehmen bedeutet:</strong><br>
+                    Drastisch verkürzte Prüfzeiten bei Ankauf • Signifikant geringeres Risiko, kritische Klauseln oder Risiken zu übersehen • Bessere und schnellere Entscheidungsvorlagen für Investmentkomitees • Entlastung von Senior-PMs bei repetitiver Dokumentenarbeit.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ROI CALCULATOR -->
+    <section id="roi" class="max-w-screen-2xl mx-auto px-8 py-20 bg-slate-900 border-y border-white/10">
+        <div class="reveal max-w-4xl mb-12">
+            <div class="text-emerald-400 text-xs tracking-[3px] font-semibold mb-3">INTERAKTIV &amp; UNVERBINDLICH</div>
+            <h2 class="section-header text-6xl tracking-tighter">ROI-Rechner: Was die Automatisierung konkret bringt</h2>
+            <p class="mt-5 text-xl text-slate-300">
+                Drei Regler, eine ehrliche Hochrechnung. Die Prozentsätze basieren auf den oben gezeigten Use-Cases (konservativ 65 % Effizienzgewinn als Mittelwert). Kein Lead-Formular, keine Anmeldung – einfach ausprobieren.
+            </p>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-10 items-start">
+            <div class="reveal-left glass rounded-3xl p-8 md:p-10 border border-white/10 space-y-8">
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="font-medium text-slate-200" for="roi-units">Verwaltete Einheiten (Gewerbe + Wohnen)</label>
+                        <span class="text-emerald-400 font-bold" id="roi-units-val">150</span>
+                    </div>
+                    <input type="range" id="roi-units" class="roi-slider w-full" min="10" max="2000" step="10" value="150">
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="font-medium text-slate-200" for="roi-hours">Stunden / Monat für Reporting, Suche &amp; Dokumentenarbeit</label>
+                        <span class="text-emerald-400 font-bold" id="roi-hours-val">60</span>
+                    </div>
+                    <input type="range" id="roi-hours" class="roi-slider w-full" min="5" max="400" step="5" value="60">
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="font-medium text-slate-200" for="roi-rate">Interner Stundensatz (Property/Asset Manager)</label>
+                        <span class="text-emerald-400 font-bold" id="roi-rate-val">55 €</span>
+                    </div>
+                    <input type="range" id="roi-rate" class="roi-slider w-full" min="25" max="150" step="5" value="55">
+                </div>
+
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="font-medium text-slate-200" for="roi-efficiency">Angenommener Effizienzgewinn durch KI-Automatisierung</label>
+                        <span class="text-emerald-400 font-bold" id="roi-efficiency-val">65 %</span>
+                    </div>
+                    <input type="range" id="roi-efficiency" class="roi-slider w-full" min="30" max="85" step="5" value="65">
+                </div>
+            </div>
+
+            <div class="reveal-right glass rounded-3xl p-8 md:p-10 border border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 to-blue-500/5">
+                <div class="text-xs tracking-[3px] font-semibold text-emerald-400 mb-6">GESCHÄTZTE HOCHRECHNUNG</div>
+
+                <div class="grid grid-cols-2 gap-6 mb-8">
+                    <div>
+                        <div class="text-4xl md:text-5xl font-bold text-white roi-result-number" id="roi-hours-saved">39 h</div>
+                        <div class="text-sm text-slate-400 mt-1">eingesparte Stunden / Monat</div>
+                    </div>
+                    <div>
+                        <div class="text-4xl md:text-5xl font-bold text-emerald-400 roi-result-number" id="roi-cost-saved">2.145 €</div>
+                        <div class="text-sm text-slate-400 mt-1">eingesparte Kosten / Monat</div>
+                    </div>
+                </div>
+
+                <div class="border-t border-white/10 pt-6 mb-6">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-300">Hochgerechnet auf 12 Monate</span>
+                        <span class="text-2xl font-bold text-white roi-result-number" id="roi-cost-saved-year">25.740 €</span>
+                    </div>
+                </div>
+
+                <div class="text-sm text-slate-400 leading-relaxed mb-6">
+                    Diese Zahl ersetzt keine individuelle Analyse, zeigt aber realistisch die Größenordnung: Bei <span id="roi-summary-units">150</span> Einheiten und <span id="roi-summary-hours">60</span> Reporting-Stunden/Monat ist das Einsparpotenzial signifikant genug, um ein Pilotprojekt zu rechtfertigen.
+                </div>
+
+                <a href="#contact" class="magnetic-btn w-full inline-flex items-center justify-center gap-x-3 h-14 rounded-3xl bg-white text-slate-950 font-semibold hover:bg-white/90 active:scale-[0.985] transition-all">
+                    <span>Pilotprojekt unverbindlich besprechen</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- STANDORTE & REICHWEITE -->
+    <section id="standorte" class="max-w-screen-2xl mx-auto px-8 py-20 bg-slate-900 border-y border-white/10">
+        <div class="grid lg:grid-cols-2 gap-x-16 gap-y-10 items-center">
+            <div class="reveal-left max-w-xl">
+                <div class="inline-flex items-center gap-x-2 px-4 py-1.5 rounded-3xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs tracking-[2px] font-semibold mb-6">
+                    <i class="fa-solid fa-globe"></i>
+                    <span>BUNDESWEIT + INTERNATIONAL VERFÜGBAR</span>
+                </div>
+                
+                <h2 class="section-header text-6xl tracking-tighter mb-6">Standorte &amp; Reichweite</h2>
+                
+                <p class="text-xl text-slate-300 mb-8 leading-relaxed">
+                    Von der Ausbildung in Hannover über Stationen in Düsseldorf, Hamburg, Berlin, Freiburg und Stuttgart bis zu internationalen Logistikmandaten in Warschau und Breslau – ich kenne die Märkte und habe vor Ort gearbeitet.
+                </p>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="glass rounded-3xl p-6 border border-white/10">
+                        <div class="flex items-center gap-x-3 mb-3">
+                            <i class="fa-solid fa-map-marker-alt text-emerald-400"></i>
+                            <div class="font-semibold">Deutschland</div>
+                        </div>
+                        <div class="text-sm text-slate-300 space-y-1">
+                            <div>Hannover (Ausbildung &amp; erste Stationen)</div>
+                            <div>Düsseldorf • Hamburg • Berlin</div>
+                            <div>Freiburg &amp; Stuttgart (Teamleitung)</div>
+                        </div>
+                    </div>
+                    <div class="glass rounded-3xl p-6 border border-white/10">
+                        <div class="flex items-center gap-x-3 mb-3">
+                            <i class="fa-solid fa-plane text-blue-400"></i>
+                            <div class="font-semibold">International</div>
+                        </div>
+                        <div class="text-sm text-slate-300 space-y-1">
+                            <div>Polen: Warschau &amp; Breslau (Brookfield 2021)</div>
+                            <div>Polnisch &amp; Englisch verhandlungssicher</div>
+                            <div>Hybrid / Remote bundesweit möglich</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 text-sm text-slate-400">
+                    Heute vorwiegend hybrid/remote tätig – mit hoher Reisebereitschaft für wichtige Termine und Objektbesichtigungen. Bei der IPH Centermanagement GmbH war ich direkt vor Ort in Hamburg tätig.
+                </div>
+            </div>
+            
+            <div class="reveal-right">
+                <div id="map" class="h-[380px] lg:h-[420px] w-full rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-slate-950"></div>
+                <div class="text-center text-xs text-slate-500 mt-3 tracking-wide">Interaktive Karte der beruflichen Stationen</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FIVERR PRÄSENTATIONEN -->
+    <section id="fiverr-prasentationen" class="max-w-screen-2xl mx-auto px-8 py-20 bg-slate-950/50 border-y border-white/10">
+        <div class="wrapper max-w-4xl">
+            <div class="text-center mb-12">
+                <div class="inline-flex items-center gap-x-2 px-4 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-400 text-xs tracking-[2px] font-semibold mb-4">
+                    <i class="fa-solid fa-briefcase"></i>
+                    <span>ZUSÄTZLICHES ANGEBOT</span>
+                </div>
+                <h2 class="section-header text-5xl tracking-tighter">Professionelle Präsentationen &amp; Pitch Decks</h2>
+                <p class="mt-4 text-xl text-slate-300 max-w-2xl mx-auto">
+                    Du brauchst eine starke, überzeugende Präsentation für Investoren, Kunden oder interne Meetings?<br>
+                    Ich erstelle klare, visuell ansprechende und professionelle Pitch Decks und Präsentationen.
+                </p>
+            </div>
+
+            <div class="max-w-md mx-auto">
+                <div class="glass rounded-3xl p-8 border border-white/10 text-center">
+                    <div class="text-4xl mb-4">📊</div>
+                    <h3 class="text-2xl font-semibold mb-3">Präsentationen auf Fiverr</h3>
+                    <p class="text-slate-300 mb-6">
+                        Hochwertige Präsentationen – individuell, strukturiert und auf deine Zielgruppe abgestimmt.
+                    </p>
+                    
+                    <a href="https://www.fiverr.com/s/R7Lrvz5" 
+                       target="_blank"
+                       class="btn btn-primary inline-flex items-center justify-center gap-x-3 w-full text-base">
+                        <span>Zum Fiverr Gig</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </a>
+                    
+                    <p class="text-xs text-slate-500 mt-4">Direkt über Fiverr buchbar • Schnelle Lieferung • Über 5 Sterne Bewertungen</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- REFERENZEN / TESTIMONIALS -->
+    <section id="referenzen" class="max-w-screen-2xl mx-auto px-8 py-20">
+        <div class="reveal max-w-4xl mb-12">
+            <div class="text-emerald-400 text-xs tracking-[3px] font-semibold mb-3">AUS DEN ARBEITSZEUGNISSEN</div>
+            <h2 class="section-header text-6xl tracking-tighter">Was frühere Arbeitgeber bestätigen</h2>
+            <p class="mt-5 text-xl text-slate-300">
+                Die folgenden Einschätzungen sind sinngemäße Zusammenfassungen aus meinen offiziellen Arbeitszeugnissen – durchgängig mit sehr guten bis ausgezeichneten Bewertungen für Fachkompetenz, Zuverlässigkeit und Führungsqualität.
+            </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="testimonial-card glass rounded-3xl p-8 border border-white/10">
+                <div class="quote-mark text-5xl mb-2">"</div>
+                <p class="text-slate-200 text-lg mb-6">Sehr genaue Analysefähigkeit und enorme Auffassungsgabe – auch in schwierigen Situationen wurden sofort zutreffende, schnelle Lösungen gefunden. Alle Aufgaben wurden selbstständig, sorgfältig und planvoll umgesetzt.</p>
+                <div class="flex items-center gap-x-3">
+                    <div class="company-logo-badge"><img src="https://logo.clearbit.com/mvgm.com" alt="MVGM Logo" loading="lazy" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-building text-violet-600\'></i>'"></div>
+                    <div>
+                        <div class="font-semibold">MVGM Property Management</div>
+                        <div class="text-xs text-slate-400">Teamleiter &amp; Senior Property Manager, 2022–2023</div>
+                    </div>
+                </div>
+                <div class="company-blurb text-xs text-slate-400 leading-relaxed">Europäischer Marktführer im Property Management, 1953 gegründet, heute rund 1.500+ Mitarbeitende an über 40 Standorten in 9 Ländern – Markenversprechen „Passion for People and Property“.</div>
+            </div>
+
+            <div class="testimonial-card glass rounded-3xl p-8 border border-white/10">
+                <div class="quote-mark text-5xl mb-2">"</div>
+                <p class="text-slate-200 text-lg mb-6">Hohe Leistungsbereitschaft und solides Fachwissen bei der Betreuung internationaler Logistikobjekte. Die Zusammenarbeit mit Geschäftsleitung, Kollegen und Mietern war jederzeit loyal, sicher und höflich.</p>
+                <div class="flex items-center gap-x-3">
+                    <div class="company-logo-badge"><img src="https://logo.clearbit.com/brookfieldproperties.com" alt="Brookfield Properties Logo" loading="lazy" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-globe text-blue-600\'></i>'"></div>
+                    <div>
+                        <div class="font-semibold">Brookfield Properties Germany</div>
+                        <div class="text-xs text-slate-400">Associate Property Management, 2021</div>
+                    </div>
+                </div>
+                <div class="company-blurb text-xs text-slate-400 leading-relaxed">Globaler Immobilieninvestor und -betreiber im Auftrag von Brookfield Asset Management; in Europa u.a. mit Potsdamer Platz Berlin und einem paneuropäischen Logistikportfolio vertreten, starker Fokus auf Nachhaltigkeit (DGNB).</div>
+            </div>
+
+            <div class="testimonial-card glass rounded-3xl p-8 border border-white/10">
+                <div class="quote-mark text-5xl mb-2">"</div>
+                <p class="text-slate-200 text-lg mb-6">Sehr gutes Fachwissen sowie ausgeprägte Kompetenz im Umgang mit SAP und IX-Haus. Aufgaben wurden zügig, systematisch und mit größtmöglicher Präzision durchgeführt – stets zur vollen Zufriedenheit.</p>
+                <div class="flex items-center gap-x-3">
+                    <div class="company-logo-badge"><img src="https://logo.clearbit.com/habacker.de" alt="Habacker Holding Logo" loading="lazy" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-warehouse text-emerald-600\'></i>'"></div>
+                    <div>
+                        <div class="font-semibold">Habacker Holding</div>
+                        <div class="text-xs text-slate-400">Senior Property Manager, 2018–2019</div>
+                    </div>
+                </div>
+                <div class="company-blurb text-xs text-slate-400 leading-relaxed">2006 in Düsseldorf gegründeter, dynamischer Mittelständler für Logistik- und Industrieimmobilien mit ca. 600 Mio. € verwaltetem Portfolio und Kunden wie Amazon, VW, Bosch, Daimler und UBS.</div>
+            </div>
+
+            <div class="testimonial-card glass rounded-3xl p-8 border border-white/10">
+                <div class="quote-mark text-5xl mb-2">"</div>
+                <p class="text-slate-200 text-lg mb-6">Großer persönlicher Einsatz weit über das eigentliche Aufgabengebiet hinaus, mit stets sehr gutem Kontakt zu Kunden und Mietern. Organisations- und Improvisationstalent als wesentlicher Erfolgsfaktor des Teams.</p>
+                <div class="flex items-center gap-x-3">
+                    <div class="company-logo-badge"><img src="https://logo.clearbit.com/centerscape.de" alt="Centerscape Logo" loading="lazy" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-shop text-amber-600\'></i>'"></div>
+                    <div>
+                        <div class="font-semibold">Centerscape Deutschland</div>
+                        <div class="text-xs text-slate-400">Kaufm. Property Manager, 2012–2017</div>
+                    </div>
+                </div>
+                <div class="company-blurb text-xs text-slate-400 leading-relaxed">2006 gegründeter, deutschlandweiter Entwickler, Eigentümer und Manager von Nahversorgungs-Einkaufszentren mit Fokus auf nachhaltige Investitionen und Wertschöpfung durch aktives Bestandsmanagement.</div>
+            </div>
+
+            <div class="testimonial-card glass rounded-3xl p-8 border border-white/10">
+                <div class="quote-mark text-5xl mb-2">"</div>
+                <p class="text-slate-200 text-lg mb-6">Schwerpunktmäßig wirkte Herr Makarczyk an Mieterbetreuung, Vertragsmanagement und Nebenkosten-Abrechnungserstellung mit – stets zuverlässig und lösungsorientiert.</p>
+                <div class="flex items-center gap-x-3">
+                    <div class="company-logo-badge"><img src="https://logo.clearbit.com/iph-cm.de" alt="IPH Centermanagement Logo" loading="lazy" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-store text-pink-600\'></i>'"></div>
+                    <div>
+                        <div class="font-semibold">IPH Centermanagement</div>
+                        <div class="text-xs text-slate-400">Property Manager, 2017–2018</div>
+                    </div>
+                </div>
+                <div class="company-blurb text-xs text-slate-400 leading-relaxed">Joint Venture aus IPH Handelsimmobilien und IC Group; Deutschlands größter unabhängiger Shopping-Center-Dienstleister mit über 160 Experten, spezialisiert auf ganzheitliches Center-Management.</div>
+            </div>
+
+            <div class="testimonial-card glass rounded-3xl p-8 border border-white/10">
+                <div class="quote-mark text-5xl mb-2">"</div>
+                <p class="text-slate-200 text-lg mb-6">Vorbildliche Eigeninitiative und volle Identifikation mit Aufgaben und Unternehmen, auch bei hohem Arbeitsaufkommen stets hoch belastbar. Aufgrund der Führungsqualitäten als Vorgesetzter besonders anerkannt und beliebt.</p>
+                <div class="flex items-center gap-x-3">
+                    <div class="company-logo-badge"><img src="https://logo.clearbit.com/mvgm.com" alt="MVGM Logo" loading="lazy" onerror="this.parentElement.innerHTML='<i class=\'fa-solid fa-users text-sky-600\'></i>'"></div>
+                    <div>
+                        <div class="font-semibold">MVGM Property Management</div>
+                        <div class="text-xs text-slate-400">Teamleiter (Führungsfunktion), 2023</div>
+                    </div>
+                </div>
+                <div class="company-blurb text-xs text-slate-400 leading-relaxed">Deutsches MVGM-Team: ca. 400+ Mitarbeitende an 16 Standorten, Verwaltung von rund 10 Mio. m² Wohn- und Gewerbefläche für über 200 Kunden – von Büro über Retail bis Wohnen.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ZITATE -->
+    <section id="zitate" class="max-w-screen-2xl mx-auto px-8 py-20 bg-slate-900 border-y border-white/10">
+        <div class="reveal max-w-4xl mb-12">
+            <div class="text-blue-400 text-xs tracking-[3px] font-semibold mb-3">GEDANKEN &amp; LEITSÄTZE</div>
+            <h2 class="section-header text-6xl tracking-tighter">Zitate, die meine Arbeit prägen</h2>
+            <p class="mt-5 text-xl text-slate-300">Vier Leitsätze aus 13+ Jahren Immobilienwirtschaft und dem eigenständigen Aufbau von KI-Systemen – die Haltung hinter dem Hybrid-Ansatz.</p>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="quote-card quote-hero-card rounded-3xl p-10 relative">
+                <div class="quote-icon-float text-violet-400 text-2xl mb-4"><i class="fa-solid fa-brain"></i></div>
+                <div class="quote-number text-sm mb-3">ZITAT NR. 1</div>
+                <p class="relative z-10 text-2xl md:text-3xl leading-snug font-medium text-white mb-6">„Ein LLM ist immer nur so gut wie der Mensch, der es führt, korrigiert und in echte Prozesse einbettet – die Technologie liefert die Rechenkraft, das Fachwissen liefert die Richtung.“</p>
+                <div class="text-sm text-slate-400">— Filip Makarczyk</div>
+            </div>
+
+            <div class="quote-card glass rounded-3xl p-10 border border-white/10">
+                <div class="quote-icon-float text-blue-400 text-2xl mb-4"><i class="fa-solid fa-gears"></i></div>
+                <div class="quote-number text-sm mb-3">ZITAT NR. 2</div>
+                <p class="text-2xl leading-snug font-medium text-white mb-6">„Wer 13 Jahre lang Prozesse in der Immobilienverwaltung von Hand optimiert hat, weiß genau, wo Automatisierung wirklich Zeit spart – und wo sie nur neue Fehlerquellen schafft.“</p>
+                <div class="text-sm text-slate-400">— Filip Makarczyk</div>
+            </div>
+
+            <div class="quote-card glass rounded-3xl p-10 border border-white/10">
+                <div class="quote-icon-float text-emerald-400 text-2xl mb-4"><i class="fa-solid fa-scale-balanced"></i></div>
+                <div class="quote-number text-sm mb-3">ZITAT NR. 3</div>
+                <p class="text-2xl leading-snug font-medium text-white mb-6">„Digitalisierung im Property Management scheitert selten an der Software – sie scheitert daran, dass niemand die operativen Abläufe wirklich von innen kennt.“</p>
+                <div class="text-sm text-slate-400">— Filip Makarczyk</div>
+            </div>
+
+            <div class="quote-card glass rounded-3xl p-10 border border-white/10">
+                <div class="quote-icon-float text-amber-400 text-2xl mb-4"><i class="fa-solid fa-arrows-to-circle"></i></div>
+                <div class="quote-number text-sm mb-3">ZITAT NR. 4</div>
+                <p class="text-2xl leading-snug font-medium text-white mb-6">„Die Zukunft der Immobilienwirtschaft gehört nicht der KI allein und nicht dem Menschen allein, sondern der Schnittstelle dazwischen – genau dort will ich arbeiten.“</p>
+                <div class="text-sm text-slate-400">— Filip Makarczyk</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TOP MODULES -->
+    <section id="modules" class="max-w-screen-2xl mx-auto px-8 pb-20">
+        <div class="reveal max-w-4xl mb-12">
+            <div class="text-violet-400 text-xs tracking-[3px] font-semibold mb-3">PRODUKTIONSREIFE SYSTEME</div>
+            <h2 class="section-header text-6xl tracking-tighter">Top 10 aufwendigste Module</h2>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="module-card glass rounded-3xl p-8 border border-white/10"><div class="font-semibold text-2xl mb-3">1. SuperAgent + Agent Loop</div><p class="text-slate-300">Master-Agent der alle Module autonom orchestriert – die Basis für komplexe Automatisierungen.</p></div>
+            <div class="module-card glass rounded-3xl p-8 border border-white/10"><div class="font-semibold text-2xl mb-3">2. Voice Cloning &amp; Live Streaming</div><p class="text-slate-300">Produktionsreife Sprach-KI mit Cloning und Echtzeit-Streaming für echte 24/7-Kommunikation.</p></div>
+            <div class="module-card glass rounded-3xl p-8 border border-white/10"><div class="font-semibold text-2xl mb-3">3. Queen’s Code Sandbox V8</div><p class="text-slate-300">Sichere interne Code-Execution-Umgebung mit AST-Parser – für das gesamte Team nutzbar.</p></div>
+            <div class="module-card glass rounded-3xl p-8 border border-white/10"><div class="font-semibold text-2xl mb-3">4. RAG Brain System (pgvector)</div><p class="text-slate-300">Semantische Suche über alle Verträge, Berichte und Dokumente mit hoher Relevanz.</p></div>
+            <div class="module-card glass rounded-3xl p-8 border border-white/10"><div class="font-semibold text-2xl mb-3">5. YouTube Intelligence Pipeline</div><p class="text-slate-300">Automatische Analyse von Videos mit Transkript, Zusammenfassung und Export.</p></div>
+            <div class="module-card glass rounded-3xl p-8 border border-white/10"><div class="font-semibold text-2xl mb-3">6. Workflow Engine</div><p class="text-slate-300">Strukturierte Generierung von Content-Paketen (Hook, Script, Shotlist, Social Media).</p></div>
+            <div class="module-card glass rounded-3xl p-8 border border-white/10"><div class="font-semibold text-2xl mb-3">7. Polling + Keepalive Architecture</div><p class="text-slate-300">Robuste Cloud-Architektur für den stabilen Betrieb interner Tools.</p></div>
+            <div class="module-card glass rounded-3xl p-8 border border-white/10"><div class="font-semibold text-2xl mb-3">8. 3D SVG → GLB Converter</div><p class="text-slate-300">Automatische Erstellung von 3D-Modellen aus Grundrissen und SVGs.</p></div>
+            <div class="module-card glass rounded-3xl p-8 border border-white/10"><div class="font-semibold text-2xl mb-3">9. Archive.org Workspace</div><p class="text-slate-300">Vollständige Recherche- und Download-Umgebung mit LLM-Unterstützung.</p></div>
+            <div class="module-card glass rounded-3xl p-8 border border-white/10"><div class="font-semibold text-2xl mb-3">10. Multi-Modal Generative Pipeline</div><p class="text-slate-300">Kombinierte Generierung von Bild, Video, Musik und Voice in einem einheitlichen Workflow.</p></div>
+        </div>
+    </section>
+
+    <!-- PROJEKTE / BOT-MODULE -->
+    <section id="projekte" class="max-w-screen-2xl mx-auto px-8 py-20 bg-slate-900 border-y border-white/10">
+        <div class="reveal max-w-4xl mb-12">
+            <div class="text-violet-400 text-xs tracking-[3px] font-semibold mb-3">LIVE-PROJEKTE DES @ALLLWEEEEL6_BOT-ÖKOSYSTEMS</div>
+            <h2 class="section-header text-6xl tracking-tighter">Projekte zum Ausprobieren</h2>
+            <p class="mt-5 text-xl text-slate-300">
+                Jedes Modul ist ein eigenständiges, produktiv laufendes Projekt – erreichbar direkt im Browser oder über den Telegram-Bot. Klick auf eine Kachel, um sie direkt zu öffnen.
+            </p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('scanner')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-violet-600/20 flex items-center justify-center text-violet-400 mb-4"><i class="fa-solid fa-qrcode text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/scanner</div>
+                <p class="text-sm text-slate-400">Dokumenten- &amp; Objekt-Scanner mit automatischer Datenextraktion.</p>
+            </div>
+
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('chess')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-blue-600/20 flex items-center justify-center text-blue-400 mb-4"><i class="fa-solid fa-chess-knight text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/chess</div>
+                <p class="text-sm text-slate-400">KI-Schachpartner – kleine Spielwiese für Agenten-Logik &amp; Strategie.</p>
+            </div>
+
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('jobs')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-emerald-600/20 flex items-center justify-center text-emerald-400 mb-4"><i class="fa-solid fa-briefcase text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/jobs</div>
+                <p class="text-sm text-slate-400">Job- &amp; Profil-Matching-Modul, abgeleitet aus der RAG-Suche.</p>
+            </div>
+
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('moost')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-amber-600/20 flex items-center justify-center text-amber-400 mb-4"><i class="fa-solid fa-music text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/moost</div>
+                <p class="text-sm text-slate-400">Generative Media &amp; Musik-Modul auf Basis der Multi-Modal-Pipeline.</p>
+            </div>
+
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('sandbox')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-pink-600/20 flex items-center justify-center text-pink-400 mb-4"><i class="fa-solid fa-terminal text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/sandbox</div>
+                <p class="text-sm text-slate-400">Queen's Code Sandbox V8 – Code direkt im Bot ausführen &amp; testen.</p>
+            </div>
+
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('superskill')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-sky-600/20 flex items-center justify-center text-sky-400 mb-4"><i class="fa-solid fa-bolt text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/superskill</div>
+                <p class="text-sm text-slate-400">Skill-Orchestrierung – kombiniert mehrere Module zu einem Workflow.</p>
+            </div>
+
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('plantid')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-teal-600/20 flex items-center justify-center text-teal-400 mb-4"><i class="fa-solid fa-seedling text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/plantid</div>
+                <p class="text-sm text-slate-400">Bilderkennung am Beispiel Pflanzenbestimmung – Computer-Vision-Demo.</p>
+            </div>
+
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('readme')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-slate-600/30 flex items-center justify-center text-slate-300 mb-4"><i class="fa-solid fa-book text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/readme</div>
+                <p class="text-sm text-slate-400">Übersicht aller Module, Befehle und der Architektur des Bots.</p>
+            </div>
+
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('archive')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-cyan-600/20 flex items-center justify-center text-cyan-400 mb-4"><i class="fa-solid fa-box-archive text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/archive</div>
+                <p class="text-sm text-slate-400">Recherche- &amp; Download-Workspace mit LLM-Unterstützung (Archive.org).</p>
+            </div>
+
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('dragon')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-red-600/20 flex items-center justify-center text-red-400 mb-4"><i class="fa-solid fa-dragon text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/dragon</div>
+                <p class="text-sm text-slate-400">Experimentelles Agenten- &amp; Simulationsmodul.</p>
+            </div>
+
+            <div class="project-card glass rounded-3xl p-7 border border-white/10" onclick="openProject('spacewar')">
+                <div class="proj-icon w-12 h-12 rounded-2xl bg-indigo-600/20 flex items-center justify-center text-indigo-400 mb-4"><i class="fa-solid fa-rocket text-2xl"></i></div>
+                <div class="font-semibold text-lg mb-1">/spacewar</div>
+                <p class="text-sm text-slate-400">KI-gesteuertes Arcade-Spiel – Spielwiese für Echtzeit-Logik.</p>
+            </div>
+        </div>
+
+        <p class="text-xs text-slate-500 mt-6">
+            Die meisten Module öffnen sich direkt live unter <strong class="text-slate-400">telllmeeesevn.onrender.com</strong>. /moost hat ein dediziertes Deployment; /jobs öffnet den vollständigen JobQueen Web-Workspace.
+        </p>
+    </section>
+
+    <!-- URL / PROJECT POPUP MODAL -->
+    <div id="url-modal" onclick="hideUrlModal()" class="hidden fixed inset-0 bg-black/70 z-[120] flex items-center justify-center p-4">
+        <div onclick="event.stopImmediatePropagation()" class="url-modal bg-slate-900 rounded-3xl max-w-md w-full border border-white/10 overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
+                <div class="font-semibold text-xl" id="url-modal-title">Projekt öffnen</div>
+                <button onclick="hideUrlModal()" class="text-2xl leading-none text-slate-400 hover:text-white">&times;</button>
+            </div>
+            <div class="p-6">
+                <p class="text-slate-300 text-sm mb-4" id="url-modal-desc">Dieses Modul wird im Telegram-Bot geöffnet.</p>
+                <div class="bg-slate-800 rounded-2xl px-4 py-3 text-sm text-slate-300 break-all mb-5" id="url-modal-link"></div>
+                <div class="flex gap-3">
+                    <button onclick="hideUrlModal()" class="flex-1 h-12 rounded-3xl border border-white/20 hover:bg-white/5 transition-colors text-sm font-medium">Schließen</button>
+                    <a id="url-modal-open" href="#" target="_blank" rel="noopener" class="flex-1 h-12 rounded-3xl bg-white text-slate-950 font-semibold flex items-center justify-center gap-x-2 hover:bg-white/90 transition-all text-sm">
+                        <span>Im Bot öffnen</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TIMELINE -->
+    <section id="timeline" class="max-w-screen-2xl mx-auto px-8 py-20 bg-slate-900 border-y border-white/10">
+        <div class="reveal max-w-4xl mb-12">
+            <h2 class="section-header text-6xl tracking-tighter">Mein Werdegang</h2>
+            <p class="mt-5 text-xl text-slate-300">13+ Jahre kontinuierlicher Aufbau operativer und strategischer Expertise – von der Ausbildung bis zur Teamleitung mit internationaler Erfahrung.</p>
+        </div>
+
+        <div class="max-w-4xl space-y-12">
+            <div class="timeline-item flex gap-8 group">
+                <div class="w-16 flex-shrink-0 pt-1">
+                    <div class="timeline-dot w-14 h-14 rounded-3xl bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center text-white text-3xl"><i class="fa-solid fa-users"></i></div>
+                </div>
+                <div class="flex-1 glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex flex-wrap items-center gap-x-4 mb-4">
+                        <div class="company-logo-badge w-9 h-9"><img src="https://logo.clearbit.com/mvgm.com" alt="MVGM" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+                        <div class="font-semibold text-2xl">MVGM Property Management</div>
+                        <span class="px-4 py-1 text-xs rounded-3xl bg-violet-600/20 text-violet-400 font-medium">TEAMLEITER</span>
+                        <span class="text-sm text-slate-400">01.2023 – 10.2023</span>
+                    </div>
+                    <p class="text-slate-300">Fachliche und disziplinarische Führung des Property Management Teams mit Profitcenter-Verantwortung in Freiburg und Stuttgart. Sehr hohe Eigeninitiative und Führungsqualität.</p>
+                </div>
+            </div>
+
+            <div class="timeline-item flex gap-8 group">
+                <div class="w-16 flex-shrink-0 pt-1">
+                    <div class="timeline-dot w-14 h-14 rounded-3xl bg-gradient-to-br from-blue-600 to-sky-600 flex items-center justify-center text-white text-3xl"><i class="fa-solid fa-globe"></i></div>
+                </div>
+                <div class="flex-1 glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex flex-wrap items-center gap-x-4 mb-4">
+                        <div class="company-logo-badge w-9 h-9"><img src="https://logo.clearbit.com/brookfieldproperties.com" alt="Brookfield" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+                        <div class="font-semibold text-2xl">Brookfield Properties</div>
+                        <span class="px-4 py-1 text-xs rounded-3xl bg-blue-600/20 text-blue-400 font-medium">INTERNATIONAL</span>
+                        <span class="text-sm text-slate-400">09.2021 – 12.2021</span>
+                    </div>
+                    <p class="text-slate-300">Associate Property Management für Logistikimmobilien in Polen mit YARDI-Implementierung und internationaler Kommunikation auf Polnisch und Englisch.</p>
+                </div>
+            </div>
+
+            <div class="timeline-item flex gap-8 group">
+                <div class="w-16 flex-shrink-0 pt-1">
+                    <div class="timeline-dot w-14 h-14 rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white text-3xl"><i class="fa-solid fa-building"></i></div>
+                </div>
+                <div class="flex-1 glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex flex-wrap items-center gap-x-4 mb-4">
+                        <div class="company-logo-badge w-9 h-9"><img src="https://logo.clearbit.com/habacker.de" alt="Habacker Holding" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+                        <div class="font-semibold text-2xl">Habacker Holding</div>
+                        <span class="px-4 py-1 text-xs rounded-3xl bg-emerald-600/20 text-emerald-400 font-medium">KEY USER</span>
+                        <span class="text-sm text-slate-400">08.2018 – 09.2019</span>
+                    </div>
+                    <p class="text-slate-300">Senior Property Manager für Core-Logistikimmobilien. Key-User für SAP und IX-Haus, Projektmanagement und Versicherungsschäden im 5-stelligen Bereich.</p>
+                </div>
+            </div>
+
+            <div class="timeline-item flex gap-8 group">
+                <div class="w-16 flex-shrink-0 pt-1">
+                    <div class="timeline-dot w-14 h-14 rounded-3xl bg-gradient-to-br from-amber-600 to-orange-600 flex items-center justify-center text-white text-3xl"><i class="fa-solid fa-store"></i></div>
+                </div>
+                <div class="flex-1 glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex flex-wrap items-center gap-x-4 mb-4">
+                        <div class="company-logo-badge w-9 h-9"><img src="https://logo.clearbit.com/iph-cm.de" alt="IPH Centermanagement" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+                        <div class="font-semibold text-2xl">IPH Centermanagement</div>
+                        <span class="px-4 py-1 text-xs rounded-3xl bg-amber-600/20 text-amber-400 font-medium">SHOPPING CENTER</span>
+                        <span class="text-sm text-slate-400">10.2017 – 01.2018</span>
+                    </div>
+                    <p class="text-slate-300">Property Manager bei der IPH Centermanagement GmbH – direkt vor Ort in Hamburg tätig, verantwortlich für ein Regional-Shopping-Center mit ca. 70.000 m² Gesamtfläche und internationalem Mietermix.</p>
+                </div>
+            </div>
+
+            <div class="timeline-item flex gap-8 group">
+                <div class="w-16 flex-shrink-0 pt-1">
+                    <div class="timeline-dot w-14 h-14 rounded-3xl bg-gradient-to-br from-pink-600 to-rose-600 flex items-center justify-center text-white text-3xl"><i class="fa-solid fa-shop"></i></div>
+                </div>
+                <div class="flex-1 glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex flex-wrap items-center gap-x-4 mb-4">
+                        <div class="company-logo-badge w-9 h-9"><img src="https://logo.clearbit.com/centerscape.de" alt="Centerscape" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+                        <div class="font-semibold text-2xl">Centerscape Deutschland</div>
+                        <span class="px-4 py-1 text-xs rounded-3xl bg-pink-600/20 text-pink-400 font-medium">5 JAHRE</span>
+                        <span class="text-sm text-slate-400">07.2012 – 06.2017</span>
+                    </div>
+                    <p class="text-slate-300">Kaufmännischer Property Manager für ca. 130.000 m² Gewerbefläche an 35 Standorten bundesweit, Schwerpunkt Lebensmitteleinzelhandel inkl. Ankaufs-Due-Diligence.</p>
+                </div>
+            </div>
+
+            <div class="timeline-item flex gap-8 group">
+                <div class="w-16 flex-shrink-0 pt-1">
+                    <div class="timeline-dot w-14 h-14 rounded-3xl bg-gradient-to-br from-slate-600 to-slate-500 flex items-center justify-center text-white text-3xl"><i class="fa-solid fa-graduation-cap"></i></div>
+                </div>
+                <div class="flex-1 glass rounded-3xl p-8 border border-white/10">
+                    <div class="flex flex-wrap items-center gap-x-4 mb-4">
+                        <div class="font-semibold text-2xl">WSW Immobilienverwaltung</div>
+                        <span class="px-4 py-1 text-xs rounded-3xl bg-slate-600/30 text-slate-300 font-medium">AUSBILDUNG</span>
+                        <span class="text-sm text-slate-400">08.2003 – 01.2006</span>
+                    </div>
+                    <p class="text-slate-300">Ausbildung zum Kaufmann in der Grundstücks- und Wohnungswirtschaft (IHK) mit Abschluss „gut". Grundstein für die gesamte spätere operative Laufbahn.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- BOT LIVE TESTEN -->
+    <section id="bot" class="max-w-screen-2xl mx-auto px-8 py-20">
+        <div class="grid lg:grid-cols-2 gap-10 items-center">
+            <div class="reveal-left">
+                <div class="inline-flex items-center gap-x-2 px-4 py-1.5 rounded-3xl bg-[#229ED9]/10 border border-[#229ED9]/30 text-[#5fc4f0] text-xs tracking-[2px] font-semibold mb-6">
+                    <i class="fa-brands fa-telegram"></i>
+                    <span>LIVE &amp; KOSTENLOS NUTZBAR</span>
+                </div>
+                <h2 class="section-header text-6xl tracking-tighter mb-6">Nicht nur lesen – selbst ausprobieren</h2>
+                <p class="text-xl text-slate-300 mb-8 leading-relaxed">
+                    Alles oben Beschriebene läuft nicht in einer Demo-Umgebung, sondern produktiv im Telegram-Bot <strong class="text-white">@Alllweeeel6_bot</strong>. Einfach QR-Code scannen oder Button klicken – kein Account, keine Installation, keine Wartezeit.
+                </p>
+                <div class="flex flex-wrap gap-4">
+                    <a href="https://t.me/Alllweeeel6_bot" target="_blank" rel="noopener" class="magnetic-btn inline-flex items-center gap-x-3 px-8 h-14 rounded-3xl bg-[#229ED9] text-white font-semibold hover:bg-[#1e8bc3] transition-all">
+                        <i class="fa-brands fa-telegram text-xl"></i>
+                        <span>@Alllweeeel6_bot öffnen</span>
+                    </a>
+                    <button onclick="openProject('readme')" class="magnetic-btn inline-flex items-center gap-x-3 px-8 h-14 rounded-3xl border border-white/20 hover:bg-white/5 font-medium transition-all">
+                        <i class="fa-solid fa-book"></i>
+                        <span>Erst /readme lesen</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="reveal-right flex justify-center">
+                <div class="glass rounded-3xl p-8 border border-white/10 text-center">
+                    <div id="bot-qr" class="bg-white rounded-2xl p-4 inline-flex items-center justify-center"></div>
+                    <div class="font-display text-xl mt-5">@Alllweeeel6_bot</div>
+                    <div class="text-xs text-slate-400 mt-1 tracking-wide">QR-Code scannen &amp; direkt loslegen</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FREE PROJECT / COMPARISON -->
+    <section id="kostenlos" class="max-w-screen-2xl mx-auto px-8 py-20 bg-slate-900 border-y border-white/10">
+        <div class="reveal max-w-4xl mb-12">
+            <div class="text-amber-400 text-xs tracking-[3px] font-semibold mb-3">DIE RAHMENBEDINGUNG</div>
+            <h2 class="section-header text-6xl tracking-tighter">Entwickelt, deployt &amp; gewartet für 0 €</h2>
+            <p class="mt-5 text-xl text-slate-300">
+                Eine feste Vorgabe für dieses Projekt: keine laufenden Kosten – weder für Entwicklung, Hosting noch Wartung. Das war kein Sparzwang aus Bequemlichkeit, sondern eine zusätzliche technische Hürde: Architektur, Modellwahl und Infrastruktur mussten konsequent auf kostenlose Tiers, effiziente Eigenentwicklung statt Drittanbieter-Abos und ressourcenschonenden Betrieb ausgelegt werden – ohne Abstriche beim Funktionsumfang.
+            </p>
+        </div>
+
+        <div class="reveal-scale glass rounded-3xl border border-white/10 overflow-hidden max-w-5xl mx-auto">
+            <div class="compare-row grid grid-cols-3 text-sm font-semibold border-b border-white/10">
+                <div class="p-5 text-slate-400">Funktion</div>
+                <div class="p-5 text-slate-400">Typische SaaS-Konkurrenz</div>
+                <div class="p-5 compare-highlight text-emerald-400">telllmeeedrei (@Alllweeeel6_bot)</div>
+            </div>
+            <div class="compare-row grid grid-cols-3 text-sm border-b border-white/5">
+                <div class="p-5 text-slate-300">Monatliche Kosten</div>
+                <div class="p-5 text-slate-400">ca. 200–2.000 €+ (Chatbot-/Workflow-Plattformen)</div>
+                <div class="p-5 compare-highlight text-white font-semibold">0 €</div>
+            </div>
+            <div class="compare-row grid grid-cols-3 text-sm border-b border-white/5">
+                <div class="p-5 text-slate-300">Multi-Agent-Workflows</div>
+                <div class="p-5 text-slate-400">Meist nur in Enterprise-Tarifen</div>
+                <div class="p-5 compare-highlight text-white">Vollständig integriert</div>
+            </div>
+            <div class="compare-row grid grid-cols-3 text-sm border-b border-white/5">
+                <div class="p-5 text-slate-300">Voice AI mit Cloning</div>
+                <div class="p-5 text-slate-400">Separates, oft teures Zusatzmodul</div>
+                <div class="p-5 compare-highlight text-white">Bestandteil des Systems</div>
+            </div>
+            <div class="compare-row grid grid-cols-3 text-sm border-b border-white/5">
+                <div class="p-5 text-slate-300">Semantische RAG-Suche</div>
+                <div class="p-5 text-slate-400">Häufig nur über Drittanbieter-Vektor-DB</div>
+                <div class="p-5 compare-highlight text-white">Selbst gehostet (pgvector)</div>
+            </div>
+            <div class="compare-row grid grid-cols-3 text-sm border-b border-white/5">
+                <div class="p-5 text-slate-300">Code-Sandbox für das Team</div>
+                <div class="p-5 text-slate-400">Selten enthalten</div>
+                <div class="p-5 compare-highlight text-white">Eigene sichere Sandbox V8</div>
+            </div>
+            <div class="compare-row grid grid-cols-3 text-sm border-b border-white/5">
+                <div class="p-5 text-slate-300">ROI-Rechner / Entscheidungsvorlagen</div>
+                <div class="p-5 text-slate-400">Meist separates Consulting nötig</div>
+                <div class="p-5 compare-highlight text-white">Direkt eingebettet</div>
+            </div>
+            <div class="compare-row grid grid-cols-3 text-sm">
+                <div class="p-5 text-slate-300">Wartung &amp; Weiterentwicklung</div>
+                <div class="p-5 text-slate-400">Im Abo enthalten, aber generisch</div>
+                <div class="p-5 compare-highlight text-white">Persönlich, kontinuierlich, kostenlos</div>
+            </div>
+        </div>
+
+        <p class="text-sm text-slate-400 max-w-3xl mx-auto text-center mt-6">
+            Die Vergleichswerte sind grobe Marktorientierung für vergleichbare Chatbot-/Automatisierungs-Plattformen, keine Angebote einzelner Anbieter. Sie zeigen die Größenordnung des hier kostenlos umgesetzten Funktionsumfangs.
+        </p>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="max-w-screen-2xl mx-auto px-8 py-20">
+        <div class="reveal max-w-4xl mb-12">
+            <div class="text-blue-400 text-xs tracking-[3px] font-semibold mb-3">DIE KLASSIKER, EHRLICH BEANTWORTET</div>
+            <h2 class="section-header text-6xl tracking-tighter">Häufig gestellte Interviewfragen</h2>
+            <p class="mt-5 text-xl text-slate-300">Mit einem Augenzwinkern, aber im Kern ernst gemeint.</p>
+        </div>
+
+        <div class="max-w-3xl mx-auto space-y-4">
+            <div class="faq-item reveal glass rounded-3xl p-6 border border-white/10" onclick="toggleFaq(this)">
+                <div class="flex items-center justify-between gap-x-4">
+                    <div class="font-semibold text-lg">Was sind Ihre Stärken?</div>
+                    <i class="fa-solid fa-chevron-down faq-chevron text-slate-400"></i>
+                </div>
+                <div class="faq-answer text-slate-300">
+                    Dinge zu Ende bringen, die eigentlich zwei verschiedene Berufe sind. Ich kann ein Shopping-Center mit 70.000 m² genauso routiniert verwalten wie eine Vektordatenbank aufsetzen – und merke meistens selbst erst hinterher, wie ungewöhnlich diese Kombination ist.
+                </div>
+            </div>
+
+            <div class="faq-item reveal glass rounded-3xl p-6 border border-white/10" onclick="toggleFaq(this)">
+                <div class="flex items-center justify-between gap-x-4">
+                    <div class="font-semibold text-lg">Was sind Ihre Schwächen?</div>
+                    <i class="fa-solid fa-chevron-down faq-chevron text-slate-400"></i>
+                </div>
+                <div class="faq-answer text-slate-300">
+                    Ich neige dazu, ein Problem so lange selbst zu lösen, bis daraus ein eigenständiges Modul mit 25 Komponenten wird – siehe dieser Telegram-Bot. Delegieren lerne ich gerade aktiv, am liebsten an einen meiner eigenen Agenten.
+                </div>
+            </div>
+
+            <div class="faq-item reveal glass rounded-3xl p-6 border border-white/10" onclick="toggleFaq(this)">
+                <div class="flex items-center justify-between gap-x-4">
+                    <div class="font-semibold text-lg">Wo sehen Sie sich in 5 Jahren?</div>
+                    <i class="fa-solid fa-chevron-down faq-chevron text-slate-400"></i>
+                </div>
+                <div class="faq-answer text-slate-300">
+                    Dort, wo Property Management und KI-Entwicklung längst keine zwei getrennten Stellenausschreibungen mehr sind – idealerweise mit Verantwortung für genau diese Schnittstelle in einem Unternehmen, das den Vorsprung früh nutzen will.
+                </div>
+            </div>
+
+            <div class="faq-item reveal glass rounded-3xl p-6 border border-white/10" onclick="toggleFaq(this)">
+                <div class="flex items-center justify-between gap-x-4">
+                    <div class="font-semibold text-lg">Warum sollten wir Sie einstellen?</div>
+                    <i class="fa-solid fa-chevron-down faq-chevron text-slate-400"></i>
+                </div>
+                <div class="faq-answer text-slate-300">
+                    Weil Sie sonst entweder einen erfahrenen Property Manager oder einen KI-Entwickler einstellen müssten – und dann trotzdem zwei Gehälter zahlen, um das zu bekommen, was hier in einer Person steckt.
+                </div>
+            </div>
+
+            <div class="faq-item reveal glass rounded-3xl p-6 border border-white/10" onclick="toggleFaq(this)">
+                <div class="flex items-center justify-between gap-x-4">
+                    <div class="font-semibold text-lg">Was machen Sie, wenn ein Server mitten in der Nacht abstürzt?</div>
+                    <i class="fa-solid fa-chevron-down faq-chevron text-slate-400"></i>
+                </div>
+                <div class="faq-answer text-slate-300">
+                    Genau deshalb gibt es den Webhook-Watchdog mit Offset-Persistenz aus Modul 7 – der Server meldet sich selbst, bevor ich es überhaupt merke. Die Kunst war, sich diesen Anruf um 3 Uhr nachts möglichst selten zu organisieren.
+                </div>
+            </div>
+
+            <div class="faq-item reveal glass rounded-3xl p-6 border border-white/10" onclick="toggleFaq(this)">
+                <div class="flex items-center justify-between gap-x-4">
+                    <div class="font-semibold text-lg">Sind Sie jetzt eher Property Manager oder Entwickler?</div>
+                    <i class="fa-solid fa-chevron-down faq-chevron text-slate-400"></i>
+                </div>
+                <div class="faq-answer text-slate-300">
+                    Beides, vollständig – nicht „ein bisschen von beidem". 13+ Jahre operative Praxis im Property Management treffen auf ein selbst gebautes, produktionsreifes KI-System. Genau diese Kombination ist der Punkt.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CONTACT -->
+    <section id="contact" class="border-t border-white/10 bg-slate-900 py-16">
+        <div class="max-w-screen-2xl mx-auto px-8">
+            <div class="reveal max-w-lg mx-auto text-center">
+                <h2 class="text-5xl font-semibold tracking-tighter mb-6">Lass uns sprechen</h2>
+                <p class="text-xl text-slate-300 mb-10">Ob Property Management mit KI-Boost, PropTech-Projekte oder eine neue Herausforderung – ich freue mich auf den Austausch.</p>
+
+                <form id="contact-form" class="space-y-4 text-left" onsubmit="handleContactSubmit(event)">
+                    <input type="text" id="contact-name" placeholder="Ihr Name / Unternehmen" required class="w-full bg-slate-800 border border-white/10 rounded-2xl px-6 h-14 text-white placeholder:text-slate-400 focus:border-violet-500 transition-colors">
+                    <input type="email" id="contact-email" placeholder="Ihre E-Mail" required class="w-full bg-slate-800 border border-white/10 rounded-2xl px-6 h-14 text-white placeholder:text-slate-400 focus:border-violet-500 transition-colors">
+                    <textarea id="contact-message" placeholder="Ihre Nachricht oder konkrete Anfrage (z.B. Reporting-Automatisierung, Voice-Assistent für Mieter, Pilotprojekt...)" rows="5" required class="w-full bg-slate-800 border border-white/10 rounded-3xl px-6 py-4 text-white placeholder:text-slate-400 focus:border-violet-500 transition-colors"></textarea>
+                    <button type="submit" class="magnetic-btn w-full h-14 rounded-3xl bg-white text-slate-950 font-semibold hover:bg-white/90 active:scale-[0.985] transition-all flex items-center justify-center gap-x-2">
+                        <span>Nachricht senden</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </form>
+                
+                <!-- Success State -->
+                <div id="contact-success" class="hidden glass rounded-3xl p-8 border border-emerald-500/30 text-center">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                        <i class="fa-solid fa-check text-emerald-400 text-3xl"></i>
+                    </div>
+                    <div class="font-semibold text-2xl mb-2 text-emerald-400">Vielen Dank für Ihre Nachricht!</div>
+                    <p class="text-slate-300 mb-6">Ich melde mich in der Regel innerhalb von 24–48 Stunden bei Ihnen. Für dringende Anfragen erreichen Sie mich auch direkt über den KI-Chat oder LinkedIn.</p>
+                    <button onclick="resetContactForm()" class="px-8 py-2.5 text-sm rounded-3xl border border-white/20 hover:bg-white/5 transition-colors">Neue Nachricht schreiben</button>
+                </div>
+
+                <div class="flex items-center justify-center gap-x-4 mt-10">
+                    <a href="https://www.linkedin.com/in/filip-makarczyk-aa512813b" target="_blank" rel="noopener" class="magnetic-btn inline-flex items-center gap-x-2 px-6 h-12 rounded-3xl bg-[#0A66C2] text-white text-sm font-medium hover:bg-[#0A66C2]/85 transition-all">
+                        <i class="fa-brands fa-linkedin-in"></i><span>LinkedIn-Profil</span>
+                    </a>
+                    <a href="https://www.xing.com/profile/Filip_Makarczyk/web_profiles?nwt_nav=profile" target="_blank" rel="noopener" class="magnetic-btn inline-flex items-center gap-x-2 px-6 h-12 rounded-3xl bg-[#00857c] text-white text-sm font-medium hover:bg-[#00857c]/85 transition-all">
+                        <i class="fa-brands fa-xing"></i><span>Xing-Profil</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="text-center py-8 text-xs text-slate-500 border-t border-white/10">
+        <div class="flex items-center justify-center gap-x-5 mb-4">
+            <a href="https://www.linkedin.com/in/filip-makarczyk-aa512813b" target="_blank" rel="noopener" class="hover:text-[#4d9fef] transition-colors flex items-center gap-x-1.5"><i class="fa-brands fa-linkedin-in"></i> LinkedIn</a>
+            <a href="https://www.xing.com/profile/Filip_Makarczyk/web_profiles?nwt_nav=profile" target="_blank" rel="noopener" class="hover:text-[#2fd6c4] transition-colors flex items-center gap-x-1.5"><i class="fa-brands fa-xing"></i> Xing</a>
+        </div>
+        © 2026 Filip Makarczyk • Hybrid zwischen Immobilienwirtschaft und KI-Entwicklung • Bundesweit + International
+    </footer>
+
+    <!-- CV MODAL -->
+    <div id="cv-modal" onclick="hideCVModal()" class="hidden fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-4">
+        <div onclick="event.stopImmediatePropagation()" class="cv-modal bg-slate-900 rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-white/10 flex flex-col">
+            <div class="flex items-center justify-between px-8 py-6 border-b border-white/10">
+                <div class="font-semibold text-3xl">Lebenslauf – Filip Makarczyk</div>
+                <button onclick="hideCVModal()" class="text-3xl leading-none text-slate-400 hover:text-white">&times;</button>
+            </div>
+            
+            <div class="overflow-y-auto p-8 space-y-10 text-sm">
+                <div>
+                    <div class="font-semibold text-xl mb-3">Zusammenfassung</div>
+                    <p class="text-slate-300">13+ Jahre Erfahrung in der Immobilienwirtschaft mit Fokus auf kaufmännische und technische Property Management. Teamleitung, internationale Projekte (Polen), Key-User für SAP/IX-Haus/YARDI. Parallel selbstständiger Aufbau eines produktionsreifen KI-Systems mit über 25 Modulen.</p>
+                </div>
+
+                <div>
+                    <div class="font-semibold text-xl mb-4">Wichtige Stationen</div>
+                    <div class="space-y-6">
+                        <div>
+                            <div class="font-medium">MVGM Property Management (2022–2023)</div>
+                            <div class="text-emerald-400 text-xs">Teamleiter + Senior Property Manager • Freiburg &amp; Stuttgart</div>
+                            <p class="text-slate-300 mt-1">Fachliche und disziplinarische Führung, Profitcenter-Verantwortung, ESG-Reporting, DGNB-Projekte.</p>
+                        </div>
+                        <div>
+                            <div class="font-medium">Brookfield Properties (2021)</div>
+                            <div class="text-emerald-400 text-xs">Associate Property Management • International (Polen)</div>
+                            <p class="text-slate-300 mt-1">Logistikimmobilien in Warschau &amp; Breslau, YARDI-Implementierung, internationale Kommunikation.</p>
+                        </div>
+                        <div>
+                            <div class="font-medium">Habacker Holding (2018–2019)</div>
+                            <div class="text-emerald-400 text-xs">Senior Property Manager • Key User SAP/IX-Haus</div>
+                            <p class="text-slate-300 mt-1">Core-Logistikimmobilien, Projektmanagement, Versicherungsschäden, Key-User für SAP und IX-Haus.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-xs text-slate-400 border-t border-white/10 pt-6">
+                    Vollständiger detaillierter Lebenslauf mit allen Zeugnissen auf Anfrage verfügbar.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHAT POPUP -->
+    <div id="chat-popup" class="hidden fixed bottom-6 right-6 w-96 max-w-[95vw] z-[110]">
+        <div class="chat-popup bg-slate-900 rounded-3xl border border-white/10 overflow-hidden flex flex-col h-[520px]">
+            <div class="bg-slate-800 px-5 py-4 flex items-center justify-between border-b border-white/10">
+                <div class="flex items-center gap-x-3">
+                    <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center">
+                        <i class="fa-solid fa-robot text-white"></i>
+                    </div>
+                    <div>
+                        <div class="font-semibold">KI-Experte</div>
+                        <div class="text-xs text-emerald-400">Kennt Ihren Kontext</div>
+                    </div>
+                </div>
+                <button onclick="hideChat()" class="text-xl text-slate-400 hover:text-white">&times;</button>
+            </div>
+
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-5 space-y-3 text-sm bg-slate-950">
+                <div class="chat-message chat-bot">
+                    Hallo! Ich kenne Filip Makarczyk's Lebenslauf, seine operative und strategische Expertise im Property Management sowie seine technischen Fähigkeiten.<br><br>
+                    <strong>Stellen Sie mir gerne eine Frage – oder wählen Sie einen schnellen Einstieg:</strong>
+                </div>
+                
+                <!-- Quick Prompts -->
+                <div class="flex flex-wrap gap-2 px-1" id="quick-prompts">
+                    <button onclick="useQuickPrompt(this)" class="text-xs px-4 py-1.5 rounded-3xl border border-white/20 hover:bg-white/5 transition-colors text-left">Welchen operativen Vorteil bringt ein Hybrid-Profil?</button>
+                    <button onclick="useQuickPrompt(this)" class="text-xs px-4 py-1.5 rounded-3xl border border-white/20 hover:bg-white/5 transition-colors text-left">Wie spart KI beim monatlichen Reporting Zeit?</button>
+                    <button onclick="useQuickPrompt(this)" class="text-xs px-4 py-1.5 rounded-3xl border border-white/20 hover:bg-white/5 transition-colors text-left">Kann Filip bei der Mieterkommunikation unterstützen?</button>
+                    <button onclick="useQuickPrompt(this)" class="text-xs px-4 py-1.5 rounded-3xl border border-white/20 hover:bg-white/5 transition-colors text-left">Wie sieht ein typisches Pilotprojekt aus?</button>
+                    <button onclick="useQuickPrompt(this)" class="text-xs px-4 py-1.5 rounded-3xl border border-white/20 hover:bg-white/5 transition-colors text-left">Was kann ich im Telegram-Bot direkt ausprobieren?</button>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-white/10 bg-slate-900">
+                <div class="flex gap-2">
+                    <input id="chat-input" type="text" placeholder="Ihre Frage..." class="flex-1 bg-slate-800 border border-white/10 rounded-3xl px-5 py-3 text-sm focus:outline-none focus:border-violet-500" onkeypress="if (event.key === 'Enter') sendChatMessage()">
+                    <button onclick="sendChatMessage()" class="px-6 rounded-3xl bg-violet-600 hover:bg-violet-500 text-white font-medium transition-all">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Button -->
+    <button onclick="showChat()" class="fixed bottom-6 right-6 w-14 h-14 rounded-3xl bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center shadow-xl z-[105] hover:scale-105 transition-transform">
+        <i class="fa-solid fa-comments text-2xl text-white"></i>
+    </button>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.classList.remove('fa-moon'); icon.classList.add('fa-sun');
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                icon.classList.remove('fa-sun'); icon.classList.add('fa-moon');
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        function switchLanguage(lang) {
+            const deBtn = document.getElementById('lang-de');
+            const enBtn = document.getElementById('lang-en');
+            if (lang === 'de') {
+                deBtn.classList.add('bg-white', 'text-slate-950'); deBtn.classList.remove('text-slate-400');
+                enBtn.classList.remove('bg-white', 'text-slate-950'); enBtn.classList.add('text-slate-400');
+            } else {
+                enBtn.classList.add('bg-white', 'text-slate-950'); enBtn.classList.remove('text-slate-400');
+                deBtn.classList.remove('bg-white', 'text-slate-950'); deBtn.classList.add('text-slate-400');
+                alert('English version coming in the next iteration.');
+            }
+        }
+
+        /* ===== PROJECT MODULE URLS ===== */
+        const BOT_USERNAME = 'Alllweeeel6_bot';
+        const PROJECT_BASE_URL = 'https://telllmeeesevn.onrender.com';
+        const TELEGRAM_BOT_URL = `https://t.me/${BOT_USERNAME}`;
+        const PROJECT_URLS = {
+            scanner:    { url: `${PROJECT_BASE_URL}/scanner`,    label: '/scanner',    desc: 'Dokumenten- & Objekt-Scanner mit automatischer Datenextraktion.' },
+            chess:      { url: `${PROJECT_BASE_URL}/chess`,      label: '/chess',       desc: 'KI-Schachpartner – Spielwiese für Agenten-Logik & Strategie.' },
+            jobs:       { url: `${PROJECT_BASE_URL}/starter`,    label: '/jobs',         desc: 'JobQueen – KI-Jobsuche über 20+ Plattformen, CV-Analyse, Anschreiben & Export (Web-UI).' },
+            moost:      { url: 'https://mooost.onrender.com', label: '/moost',        desc: 'Generative Media & Musik-Modul der Multi-Modal-Pipeline.' },
+            sandbox:    { url: `${PROJECT_BASE_URL}/sandbox`,    label: '/sandbox',      desc: "Queen's Code Sandbox V8 – Code direkt im Bot ausführen." },
+            superskill: { url: `${PROJECT_BASE_URL}/superskill`, label: '/superskill',   desc: 'Skill-Orchestrierung – kombiniert mehrere Module zu einem Workflow.' },
+            plantid:    { url: `${PROJECT_BASE_URL}/plantid`,    label: '/plantid',      desc: 'Computer-Vision-Demo am Beispiel Pflanzenbestimmung.' },
+            readme:     { url: TELEGRAM_BOT_URL,                 label: '/readme',       desc: 'Übersicht aller Module, Befehle und der Architektur des Bots. (Im Bot mit /readme aufrufen)' },
+            archive:    { url: `${PROJECT_BASE_URL}/archive`,    label: '/archive',      desc: 'Recherche- & Download-Workspace mit LLM-Unterstützung (Archive.org).' },
+            dragon:     { url: `${PROJECT_BASE_URL}/dragon`,     label: '/dragon',       desc: 'Experimentelles Agenten- & Simulationsmodul.' },
+            spacewar:   { url: `${PROJECT_BASE_URL}/spacewar`,   label: '/spacewar',     desc: 'Kleines KI-gesteuertes Arcade-Spiel – Spielwiese für Echtzeit-Logik.' }
+        };
+
+        function openProject(key) {
+            const proj = PROJECT_URLS[key];
+            if (!proj) return;
+
+            // Versuche zuerst ein echtes Popup-Fenster zu öffnen
+            const popup = window.open(proj.url, `project_${key}`, 'width=420,height=760,noopener,noreferrer');
+
+            // Falls Popups blockiert sind, zeige stattdessen das Modal mit Link
+            if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+                document.getElementById('url-modal-title').textContent = proj.label;
+                document.getElementById('url-modal-desc').textContent = proj.desc;
+                document.getElementById('url-modal-link').textContent = proj.url;
+                const openBtn = document.getElementById('url-modal-open');
+                openBtn.href = proj.url;
+                const isBotLink = proj.url.includes('t.me');
+                openBtn.querySelector('span').textContent = isBotLink ? 'Im Bot öffnen' : 'Zum Modul';
+                document.getElementById('url-modal').classList.remove('hidden');
+                document.getElementById('url-modal').classList.add('flex');
+            }
+        }
+
+        function hideUrlModal() {
+            document.getElementById('url-modal').classList.add('hidden');
+            document.getElementById('url-modal').classList.remove('flex');
+        }
+
+        /* ===== FAQ ACCORDION ===== */
+        function toggleFaq(item) {
+            const answer = item.querySelector('.faq-answer');
+            const isOpen = item.classList.contains('open');
+            document.querySelectorAll('.faq-item.open').forEach(el => {
+                if (el !== item) {
+                    el.classList.remove('open');
+                    el.querySelector('.faq-answer').style.maxHeight = null;
+                }
+            });
+            if (isOpen) {
+                item.classList.remove('open');
+                answer.style.maxHeight = null;
+            } else {
+                item.classList.add('open');
+                answer.style.maxHeight = answer.scrollHeight + 'px';
+            }
+        }
+
+        /* ===== ROI CALCULATOR ===== */
+        function initRoiCalculator() {
+            const unitsEl = document.getElementById('roi-units');
+            const hoursEl = document.getElementById('roi-hours');
+            const rateEl = document.getElementById('roi-rate');
+            const effEl = document.getElementById('roi-efficiency');
+            if (!unitsEl || !hoursEl || !rateEl || !effEl) return;
+
+            const fmtEUR = (n) => n.toLocaleString('de-DE', { maximumFractionDigits: 0 }) + ' €';
+
+            function recalc() {
+                const units = parseInt(unitsEl.value, 10);
+                const hours = parseInt(hoursEl.value, 10);
+                const rate = parseInt(rateEl.value, 10);
+                const eff = parseInt(effEl.value, 10) / 100;
+
+                // Größere Portfolios skalieren den Zeitaufwand leicht mit, ohne die Stunden-Eingabe zu überschreiben
+                const scaleFactor = 1 + Math.min(units / 1000, 0.4);
+                const effectiveHours = hours * scaleFactor;
+
+                const hoursSaved = effectiveHours * eff;
+                const costSavedMonth = hoursSaved * rate;
+                const costSavedYear = costSavedMonth * 12;
+
+                document.getElementById('roi-units-val').textContent = units;
+                document.getElementById('roi-hours-val').textContent = hours;
+                document.getElementById('roi-rate-val').textContent = rate + ' €';
+                document.getElementById('roi-efficiency-val').textContent = Math.round(eff * 100) + ' %';
+
+                document.getElementById('roi-hours-saved').textContent = Math.round(hoursSaved) + ' h';
+                document.getElementById('roi-cost-saved').textContent = fmtEUR(Math.round(costSavedMonth));
+                document.getElementById('roi-cost-saved-year').textContent = fmtEUR(Math.round(costSavedYear));
+                document.getElementById('roi-summary-units').textContent = units;
+                document.getElementById('roi-summary-hours').textContent = hours;
+            }
+
+            [unitsEl, hoursEl, rateEl, effEl].forEach(el => el.addEventListener('input', recalc));
+            recalc();
+        }
+
+        /* ===== BOT QR CODE ===== */
+        function initBotQr() {
+            const target = document.getElementById('bot-qr');
+            if (!target || typeof QRCode === 'undefined') return;
+            new QRCode(target, {
+                text: `https://t.me/${BOT_USERNAME}`,
+                width: 180,
+                height: 180,
+                colorDark: '#0f172a',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        }
+
+        function initNavbar() {
+            const navbar = document.getElementById('navbar');
+            window.addEventListener('scroll', () => {
+                navbar.classList.toggle('nav-scrolled', window.scrollY > 60);
+            });
+        }
+
+        /* ===== PARALLAX ORBS ===== */
+        function initParallax() {
+            const orbs = document.querySelectorAll('.parallax-orb');
+            if (!orbs.length) return;
+            let ticking = false;
+            function update() {
+                const y = window.scrollY;
+                orbs.forEach(o => {
+                    const speed = parseFloat(o.dataset.speed || 0.2);
+                    o.style.transform = `translateY(${y * speed}px)`;
+                });
+                ticking = false;
+            }
+            window.addEventListener('scroll', () => {
+                if (!ticking) { requestAnimationFrame(update); ticking = true; }
+            }, { passive: true });
+            update();
+        }
+
+        /* ===== SCROLL REVEAL (auto-tag remaining cards + observe) ===== */
+        function initScrollReveal() {
+            // auto-tag card grids that don't already have an explicit reveal class
+            const autoSelectors = ['.expertise-card', '.use-case-card', '.module-card', '.testimonial-card', '.timeline-item', '.project-card'];
+            autoSelectors.forEach(sel => {
+                document.querySelectorAll(sel).forEach((el, i) => {
+                    if (!el.classList.contains('reveal') && !el.classList.contains('reveal-scale')) {
+                        el.classList.add('reveal');
+                        el.style.setProperty('--rd', `${(i % 3) * 70}ms`);
+                    }
+                });
+            });
+
+            const revealEls = document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('in-view');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.12, rootMargin: '0px 0px -60px 0px' });
+
+            revealEls.forEach(el => observer.observe(el));
+        }
+
+        /* ===== STAT COUNTERS ===== */
+        function initCounters() {
+            const counters = document.querySelectorAll('.stat-counter');
+            if (!counters.length) return;
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    const el = entry.target;
+                    const target = parseInt(el.dataset.countTo || '0', 10);
+                    const suffix = el.dataset.suffix || '';
+                    const duration = 1200;
+                    const start = performance.now();
+                    function step(now) {
+                        const progress = Math.min((now - start) / duration, 1);
+                        const eased = 1 - Math.pow(1 - progress, 3);
+                        el.textContent = Math.round(eased * target) + suffix;
+                        if (progress < 1) requestAnimationFrame(step);
+                    }
+                    requestAnimationFrame(step);
+                    observer.unobserve(el);
+                });
+            }, { threshold: 0.5 });
+            counters.forEach(c => observer.observe(c));
+        }
+
+        /* ===== WORKSPACE / LIVE-EDIT MODE ===== */
+        let workspaceMode = false;
+
+        function toggleWorkspaceMode() {
+            workspaceMode = !workspaceMode;
+            const banner = document.getElementById('workspace-banner');
+            const btn = document.getElementById('workspace-toggle-btn');
+            document.body.classList.toggle('workspace-active', workspaceMode);
+
+            if (workspaceMode) {
+                enableWorkspaceMode();
+                banner.classList.remove('hidden');
+                banner.classList.add('flex');
+                btn.classList.add('ws-toggle-active');
+            } else {
+                disableWorkspaceMode();
+                banner.classList.add('hidden');
+                banner.classList.remove('flex');
+                btn.classList.remove('ws-toggle-active');
+            }
+        }
+
+        function enableWorkspaceMode() {
+            const itemSelectors = '.skill-card, .use-case-card, .module-card, .expertise-card, .testimonial-card, .project-card, .faq-item, .timeline-item .flex-1, #map, nav > div > div';
+            const textSelectors = 'h1, h2, h3, p, span, li, button, .font-display, label';
+
+            document.querySelectorAll(itemSelectors).forEach(el => {
+                if (el.closest('#workspace-banner') || el.closest('#cv-modal') || el.closest('#chat-popup') || el.id === 'map') return;
+                el.classList.add('ws-item');
+                if (!el.dataset.wsInit) {
+                    el.dataset.wsInit = '1';
+                    attachDrag(el);
+                    attachResize(el);
+                }
+            });
+
+            document.querySelectorAll(textSelectors).forEach(el => {
+                if (el.closest('#workspace-banner') || el.closest('nav')) return;
+                if (el.children.length === 0 && el.textContent.trim().length > 0) {
+                    el.setAttribute('contenteditable', 'true');
+                    el.classList.add('ws-editable-text');
+                }
+            });
+        }
+
+        function disableWorkspaceMode() {
+            document.querySelectorAll('.ws-editable-text').forEach(el => {
+                el.removeAttribute('contenteditable');
+                el.classList.remove('ws-editable-text');
+            });
+            document.querySelectorAll('.ws-item').forEach(el => el.classList.remove('ws-item'));
+        }
+
+        function attachDrag(el) {
+            let startX, startY, origX = 0, origY = 0, dragging = false;
+
+            el.addEventListener('mousedown', (e) => {
+                if (!workspaceMode) return;
+                if (e.target.classList.contains('ws-resize-handle') || e.target.closest('.ws-resize-handle')) return;
+                if (e.target.isContentEditable) return; // let text editing take the click
+                e.preventDefault();
+                dragging = true;
+                startX = e.clientX; startY = e.clientY;
+                const tf = el.style.transform.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+                origX = tf ? parseFloat(tf[1]) : 0;
+                origY = tf ? parseFloat(tf[2]) : 0;
+                el.classList.add('ws-dragging');
+                document.body.style.userSelect = 'none';
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!dragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                el.style.transform = `translate(${origX + dx}px, ${origY + dy}px)`;
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (dragging) {
+                    dragging = false;
+                    el.classList.remove('ws-dragging');
+                    document.body.style.userSelect = '';
+                }
+            });
+        }
+
+        function attachResize(el) {
+            const handle = document.createElement('div');
+            handle.className = 'ws-resize-handle';
+            handle.innerHTML = '<i class="fa-solid fa-up-right-and-down-left-from-center"></i>';
+            el.appendChild(handle);
+
+            let resizing = false, startX, startY, startW, startH;
+
+            handle.addEventListener('mousedown', (e) => {
+                if (!workspaceMode) return;
+                e.preventDefault();
+                e.stopPropagation();
+                resizing = true;
+                startX = e.clientX; startY = e.clientY;
+                startW = el.offsetWidth; startH = el.offsetHeight;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!resizing) return;
+                const dw = e.clientX - startX;
+                const dh = e.clientY - startY;
+                el.style.width = Math.max(100, startW + dw) + 'px';
+                el.style.height = Math.max(50, startH + dh) + 'px';
+            });
+
+            window.addEventListener('mouseup', () => { resizing = false; });
+        }
+
+        function initMap() {
+            const map = L.map('map').setView([50.5, 10.5], 6);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(map);
+
+            const locations = [
+                { lat: 52.3759, lng: 9.7320, title: "Hannover", desc: "Ausbildung + Centerscape + Praktika (mehrere Jahre)" },
+                { lat: 51.2277, lng: 6.7735, title: "Düsseldorf", desc: "Habacker Holding – Senior PM & Key User (2018–2019)" },
+                { lat: 53.5511, lng: 9.9937, title: "Hamburg", desc: "IPH Centermanagement – Property Manager vor Ort (2017–2018)" },
+                { lat: 52.5200, lng: 13.4050, title: "Berlin", desc: "Brookfield Properties – Associate (2021)" },
+                { lat: 47.9990, lng: 7.8421, title: "Freiburg", desc: "MVGM – Teamleiter & Senior PM (2022–2023)" },
+                { lat: 48.7758, lng: 9.1829, title: "Stuttgart", desc: "MVGM – Senior Property Manager (2022–2023)" },
+                { lat: 52.2297, lng: 21.0122, title: "Warschau (Polen)", desc: "Brookfield – Internationale Logistikimmobilien (2021)" },
+                { lat: 51.1079, lng: 17.0385, title: "Breslau (Polen)", desc: "Brookfield – Internationale Logistikimmobilien (2021)" }
+            ];
+
+            locations.forEach(loc => {
+                const marker = L.marker([loc.lat, loc.lng]).addTo(map);
+                marker.bindPopup(`<b>${loc.title}</b><br>${loc.desc}`);
+            });
+        }
+
+        function showCVModal() {
+            document.getElementById('cv-modal').classList.remove('hidden');
+            document.getElementById('cv-modal').classList.add('flex');
+        }
+        function hideCVModal() {
+            document.getElementById('cv-modal').classList.remove('flex');
+            document.getElementById('cv-modal').classList.add('hidden');
+        }
+
+        let chatOpen = false;
+        function showChat() {
+            document.getElementById('chat-popup').classList.remove('hidden');
+            chatOpen = true;
+        }
+        function hideChat() {
+            document.getElementById('chat-popup').classList.add('hidden');
+            chatOpen = false;
+        }
+
+        function useQuickPrompt(btn) {
+            const input = document.getElementById('chat-input');
+            const messagesDiv = document.getElementById('chat-messages');
+            
+            // Remove quick prompts after first use for cleaner chat
+            const quickContainer = document.getElementById('quick-prompts');
+            if (quickContainer) quickContainer.style.display = 'none';
+            
+            input.value = btn.textContent;
+            sendChatMessage();
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const messagesDiv = document.getElementById('chat-messages');
+
+            const userDiv = document.createElement('div');
+            userDiv.className = 'chat-message chat-user ml-auto';
+            userDiv.textContent = message;
+            messagesDiv.appendChild(userDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            input.value = '';
+
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'chat-message chat-bot';
+            loadingDiv.textContent = 'Denke nach...';
+            messagesDiv.appendChild(loadingDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                const data = await response.json();
+                loadingDiv.remove();
+
+                const botDiv = document.createElement('div');
+                botDiv.className = 'chat-message chat-bot';
+                botDiv.innerHTML = data.reply ? data.reply.replace(/\n/g, '<br>') : 'Entschuldigung, es gab ein technisches Problem.';
+                messagesDiv.appendChild(botDiv);
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            } catch (error) {
+                loadingDiv.remove();
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'chat-message chat-bot text-red-400';
+                errorDiv.textContent = 'Fehler bei der Verbindung zum KI-Chat.';
+                messagesDiv.appendChild(errorDiv);
+            }
+        }
+
+        function handleContactSubmit(e) {
+            e.preventDefault();
+            const form = document.getElementById('contact-form');
+            const success = document.getElementById('contact-success');
+            
+            // Simple client-side validation already handled by required
+            form.style.display = 'none';
+            success.classList.remove('hidden');
+            success.classList.add('flex', 'flex-col', 'items-center');
+            
+            // In production: here would be fetch to backend or EmailJS / Formspree
+            console.log('%c[Landing Page] Contact form submitted (demo mode)', 'color:#64748b');
+        }
+        
+        function resetContactForm() {
+            const form = document.getElementById('contact-form');
+            const success = document.getElementById('contact-success');
+            
+            form.style.display = 'block';
+            form.reset();
+            success.classList.add('hidden');
+            success.classList.remove('flex', 'flex-col', 'items-center');
+        }
+
+        function initActiveNav() {
+            const navLinks = document.querySelectorAll('nav a[href^="#"]');
+            const sections = Array.from(navLinks).map(link => document.querySelector(link.getAttribute('href'))).filter(Boolean);
+            
+            if (!sections.length) return;
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        navLinks.forEach(link => link.classList.remove('text-white', 'font-semibold'));
+                        const activeLink = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+                        if (activeLink) activeLink.classList.add('text-white', 'font-semibold');
+                    }
+                });
+            }, { threshold: 0.3, rootMargin: '-80px 0px -40% 0px' });
+            
+            sections.forEach(section => observer.observe(section));
+        }
+
+        function init() {
+            initNavbar();
+            initMap();
+            initParallax();
+            initScrollReveal();
+            initCounters();
+            initRoiCalculator();
+            initBotQr();
+
+            const savedTheme = localStorage.getItem('theme');
+            const icon = document.getElementById('theme-icon');
+            if (savedTheme === 'light') {
+                document.documentElement.classList.remove('dark');
+                icon.classList.remove('fa-moon'); icon.classList.add('fa-sun');
+            } else {
+                document.documentElement.classList.add('dark');
+                icon.classList.add('fa-moon');
+            }
+
+            document.getElementById('lang-de').classList.add('bg-white', 'text-slate-950');
+
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        e.preventDefault();
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            });
+
+            // Active nav highlighting
+            initActiveNav();
+
+            console.log('%c[Landing Page v8] Parallax, Scroll-Reveal, Referenzen-Sektion, erweiterte Timeline + Workspace-Live-Edit-Modus', 'color:#22c55e');
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

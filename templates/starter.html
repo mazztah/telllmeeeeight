@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>JobQueen – Workspace</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #0f0f1a;
+      --s1:      #1a1a2e;
+      --s2:      #252540;
+      --border:  #2a2f3f;
+      --border2: #3a3f55;
+      --text:    #e8ecf4;
+      --text2:   #b8bdd4;
+      --muted:   #7a8099;
+      --accent:  #a78bfa;
+      --green:   #34d399;
+      --red:     #ff3366;
+      --nav-h:   48px;
+      --bot-h:   60px;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+    /* ═══ BASE (mobile-first) ══════════════════════════════════════ */
+    html { overflow-x:hidden; -webkit-text-size-adjust:100%; }
+    body {
+      font-family:'Inter', system-ui, sans-serif;
+      background:var(--bg); color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      min-height:100vh; overflow-x:hidden;
+      /* Mobile: normal scrollable page */
+      display:block; overflow-y:auto;
+    }
+
+    /* ── MOBILE NAV (sticky horizontal bar) ──────────────── */
+    .nav-sidebar {
+      position:sticky; top:0; z-index:200;
+      width:100%; height:var(--nav-h);
+      background:var(--s1);
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center;
+      padding:0 14px; gap:10px;
+    }
+    .nav-logo { font-size:1.1rem; font-weight:800; color:var(--accent); flex-shrink:0; }
+    .nav-title { font-size:0.8rem; font-weight:600; color:var(--text2); }
+    .nav-spacer { flex:1; }
+    .nav-chat-btn {
+      padding:7px 13px; background:rgba(167,139,250,0.12);
+      border:1px solid rgba(167,139,250,0.3);
+      border-radius:8px; font-size:0.75rem; color:var(--accent);
+      cursor:pointer; white-space:nowrap; flex-shrink:0;
+      -webkit-tap-highlight-color:transparent;
+    }
+    /* Desktop icon-only nav items hidden on mobile */
+    .nav-icon { display:none; }
+    .nav-sep  { display:none; }
+
+    /* ── TOPBAR ──────────────────────────────────────────── */
+    .topbar {
+      height:40px; padding:0 16px;
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; gap:10px;
+      background:var(--s1);
+    }
+    .topbar-title { font-size:0.8rem; font-weight:700; color:var(--text2); }
+    .topbar-title span { color:var(--accent); }
+    .topbar-spacer { flex:1; }
+    .topbar-badge {
+      padding:3px 9px; background:rgba(52,211,153,0.1);
+      border:1px solid rgba(52,211,153,0.25);
+      border-radius:100px; font-size:0.68rem; color:var(--green);
+    }
+
+    /* ── TABBAR ──────────────────────────────────────────── */
+    .tabbar {
+      height:38px; padding:0 14px;
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:flex-end;
+      background:var(--s1); overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
+    }
+    .tabbar::-webkit-scrollbar { display:none; }
+    .tab {
+      padding:0 14px; height:36px; display:flex; align-items:center;
+      font-size:0.75rem; font-weight:600; color:var(--muted);
+      cursor:pointer; border-bottom:2px solid transparent;
+      transition:all .2s; gap:5px; white-space:nowrap;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+    /* ── SEARCH (sticky below nav) ───────────────────────── */
+    .search-sticky {
+      position:sticky; top:var(--nav-h); z-index:100;
+      background:var(--bg);
+      padding:10px 14px;
+      border-bottom:1px solid var(--border);
+    }
+    .search-bar { display:flex; gap:8px; align-items:center; }
+    .search-input-wrap {
+      flex:1; display:flex; align-items:center; gap:8px;
+      background:var(--s1); border:1px solid var(--border2);
+      border-radius:10px; padding:10px 14px;
+      transition:border-color .2s; min-width:0;
+    }
+    .search-input-wrap:focus-within { border-color:var(--accent); }
+    .search-input-wrap input {
+      flex:1; background:none; border:none; outline:none;
+      font-family:inherit; font-size:0.88rem; color:var(--text);
+      min-width:0;
+      /* Android: prevent zoom on focus */
+      font-size:16px;
+    }
+    .search-input-wrap input::placeholder { color:var(--muted); font-size:14px; }
+    .search-run {
+      padding:10px 16px; background:var(--accent); color:#0f0f1a;
+      border:none; border-radius:9px; font-size:0.82rem; font-weight:700;
+      cursor:pointer; white-space:nowrap; flex-shrink:0;
+      /* Touch: min 44px */
+      min-height:44px;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    /* ── CONTENT AREA ────────────────────────────────────── */
+    .content {
+      display:block; padding:14px;
+      /* Leave room for fixed bottom nav */
+      padding-bottom:calc(var(--bot-h) + 16px);
+    }
+    .content.hidden { display:none; }
+
+    .gap { margin-bottom:18px; }
+
+    /* Section head */
+    .sec-head {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:10px;
+    }
+    .sec-head h2 {
+      font-size:0.72rem; font-weight:700; color:var(--text2);
+      letter-spacing:0.06em; text-transform:uppercase;
+    }
+    .sec-head a { font-size:0.72rem; color:var(--accent); cursor:pointer; }
+
+    /* Platform grid */
+    .platform-grid {
+      display:grid; grid-template-columns:1fr 1fr; gap:10px;
+    }
+    .platform-card {
+      background:var(--s1); border:1px solid var(--border);
+      border-radius:12px; padding:13px;
+      cursor:pointer; transition:border-color .2s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .platform-card:active { border-color:rgba(167,139,250,0.5); }
+    .plat-top { display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+    .plat-icon {
+      width:30px; height:30px; border-radius:7px;
+      background:var(--s2); display:flex; align-items:center;
+      justify-content:center; font-size:0.9rem; flex-shrink:0;
+    }
+    .plat-name { font-size:0.8rem; font-weight:700; }
+    .plat-tag {
+      font-size:0.62rem; padding:1px 7px;
+      background:var(--s2); border-radius:100px; color:var(--muted);
+    }
+    .plat-desc { font-size:0.72rem; color:var(--text2); line-height:1.5; }
+
+    /* Job results container */
+    #jobs-container {
+      display:grid; grid-template-columns:1fr; gap:10px;
+    }
+    .job-card {
+      background:var(--s1); border:1px solid var(--border);
+      border-radius:12px; padding:14px; cursor:pointer;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .job-card:hover { border-color:rgba(167,139,250,0.5); box-shadow:0 2px 12px rgba(109,40,217,.08); }
+    .job-card:active { border-color:rgba(167,139,250,0.7); }
+    .job-title { font-size:0.85rem; font-weight:700; margin-bottom:4px; }
+    .job-meta { font-size:0.72rem; color:var(--text2); margin-bottom:6px; }
+    .job-desc { font-size:0.73rem; color:var(--muted); line-height:1.5; margin-bottom:8px; }
+    .job-actions { display:flex; gap:7px; margin-top:9px; flex-wrap:wrap; align-items:center; }
+    .job-apply-btn {
+      font-size:0.7rem; font-weight:600; color:#fff;
+      background:linear-gradient(135deg,#7c3aed,#a78bfa);
+      text-decoration:none; border-radius:7px; padding:4px 12px;
+      display:inline-block; white-space:nowrap;
+      box-shadow:0 1px 6px rgba(109,40,217,.25);
+      transition: opacity .15s;
+    }
+    .job-apply-btn:hover { opacity:.85; }
+    .job-cl-btn {
+      font-size:0.7rem; color:var(--text2); border:1px solid var(--border);
+      border-radius:7px; padding:4px 10px; cursor:pointer;
+      display:inline-block; white-space:nowrap;
+      transition: background .15s;
+    }
+    .job-cl-btn:hover { background:var(--s2); }
+
+    /* Search loading state */
+    .search-loading {
+      text-align:center; padding:32px 16px;
+      font-size:0.82rem; color:var(--muted);
+    }
+    .spinner {
+      width:24px; height:24px; border:2px solid var(--border2);
+      border-top-color:var(--accent); border-radius:50%;
+      animation:spin .7s linear infinite; margin:0 auto 12px;
+    }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* Kanban (Bewerbungen tab) */
+    .kanban { display:flex; flex-direction:column; gap:10px; }
+    .kanban-col {
+      background:var(--s1); border:1px solid var(--border);
+      border-radius:10px; padding:12px;
+    }
+    .kanban-head {
+      font-size:0.7rem; font-weight:700; color:var(--muted);
+      margin-bottom:10px; text-transform:uppercase; letter-spacing:0.05em;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .kanban-count {
+      background:var(--s2); border-radius:100px;
+      padding:1px 7px; font-size:0.68rem; color:var(--text2);
+    }
+    .kanban-card {
+      background:var(--s2); border:1px solid var(--border2);
+      border-radius:8px; padding:10px; margin-bottom:8px; font-size:0.77rem;
+    }
+    .kanban-card .company { color:var(--muted); font-size:0.7rem; margin-top:3px; }
+    .kanban-empty { font-size:0.75rem; color:var(--muted); text-align:center; padding:14px 0; }
+
+    /* ── CHAT SIDEBAR (desktop) ──────────────────────────── */
+    .chat-sidebar { display:none; } /* hidden on mobile */
+
+    /* ── CHAT OVERLAY (mobile) ───────────────────────────── */
+    .chat-overlay {
+      display:none;
+      position:fixed; inset:0; z-index:500;
+      flex-direction:column;
+      background:var(--s1);
+    }
+    .chat-overlay.open { display:flex; }
+
+    .chat-header {
+      height:52px; flex-shrink:0;
+      border-bottom:1px solid var(--border);
+      padding:0 16px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .chat-back-btn {
+      padding:6px 12px; background:var(--s2);
+      border:1px solid var(--border); border-radius:8px;
+      font-size:0.78rem; color:var(--text2); cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .chat-avatar {
+      width:28px; height:28px; border-radius:50%;
+      background:rgba(167,139,250,0.2);
+      border:1px solid rgba(167,139,250,0.4);
+      display:flex; align-items:center; justify-content:center; font-size:0.8rem;
+    }
+    .chat-header-info h3 { font-size:0.82rem; font-weight:700; }
+    .chat-header-info span { font-size:0.68rem; color:var(--green); }
+
+    .chat-messages {
+      flex:1; overflow-y:auto; padding:12px;
+      display:flex; flex-direction:column; gap:9px;
+      -webkit-overflow-scrolling:touch;
+    }
+    .msg {
+      max-width:92%; padding:10px 13px;
+      font-size:0.8rem; line-height:1.55;
+    }
+    .msg-ai {
+      background:var(--s2); border:1px solid var(--border);
+      border-radius:4px 12px 12px 12px; align-self:flex-start;
+    }
+    .msg-user {
+      background:rgba(167,139,250,0.18); border:1px solid rgba(167,139,250,0.3);
+      border-radius:12px 4px 12px 12px; align-self:flex-end;
+    }
+    .msg-ai b { color:var(--accent); }
+    .typing {
+      display:inline-flex; gap:4px; padding:10px 14px;
+      background:var(--s2); border:1px solid var(--border);
+      border-radius:4px 12px 12px 12px; align-self:flex-start;
+    }
+    .typing span {
+      width:5px; height:5px; border-radius:50%; background:var(--muted);
+      animation:bounce .8s infinite;
+    }
+    .typing span:nth-child(2) { animation-delay:.15s; }
+    .typing span:nth-child(3) { animation-delay:.3s; }
+    @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+
+    .chat-chips {
+      padding:6px 12px 8px; display:flex; flex-wrap:wrap; gap:6px;
+      flex-shrink:0;
+    }
+    .q-chip {
+      padding:5px 11px; background:var(--s2); border:1px solid var(--border);
+      border-radius:100px; font-size:0.72rem; color:var(--text2);
+      cursor:pointer; -webkit-tap-highlight-color:transparent;
+    }
+    .q-chip:active { border-color:var(--accent); color:var(--accent); }
+
+    .upload-zone {
+      margin:0 12px 8px;
+      border:1px dashed var(--border2); border-radius:10px;
+      padding:12px; text-align:center; cursor:pointer;
+      flex-shrink:0;
+    }
+    .upload-zone:active { border-color:var(--accent); }
+    .uz-icon { font-size:1rem; margin-bottom:3px; }
+    .uz-text { font-size:0.7rem; color:var(--muted); }
+    .uz-text b { color:var(--accent); }
+    .upload-zone input { display:none; }
+
+    .chat-input-wrap {
+      padding:10px 12px; border-top:1px solid var(--border);
+      display:flex; gap:8px; align-items:flex-end; flex-shrink:0;
+      padding-bottom:max(10px, env(safe-area-inset-bottom));
+    }
+    .chat-input {
+      flex:1; background:var(--s2); border:1px solid var(--border);
+      border-radius:10px; padding:9px 12px;
+      font-family:inherit; font-size:16px; color:var(--text);
+      outline:none; resize:none; min-height:40px; max-height:90px;
+    }
+    .chat-input:focus { border-color:var(--accent); }
+    .chat-input::placeholder { color:var(--muted); }
+    .chat-send {
+      width:40px; height:40px; border-radius:9px;
+      background:var(--accent); border:none;
+      color:#0f0f1a; font-size:1rem; cursor:pointer;
+      flex-shrink:0; display:flex; align-items:center; justify-content:center;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    /* ── BOTTOM NAV (mobile only) ────────────────────────── */
+    .bottom-nav {
+      position:fixed; bottom:0; left:0; right:0;
+      height:var(--bot-h);
+      background:var(--s1); border-top:1px solid var(--border);
+      display:flex; justify-content:space-around; align-items:center;
+      z-index:150;
+      padding-bottom:env(safe-area-inset-bottom);
+    }
+    .bnav-item {
+      flex:1; display:flex; flex-direction:column;
+      align-items:center; gap:2px; cursor:pointer;
+      color:var(--muted); padding:8px 0;
+      font-size:1.1rem;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .bnav-label { font-size:0.6rem; color:var(--muted); }
+    .bnav-item.active { color:var(--accent); }
+    .bnav-item.active .bnav-label { color:var(--accent); }
+
+    /* ═══ DESKTOP OVERRIDES (≥901px) ═══════════════════════════════ */
+    @media (min-width:901px) {
+      html, body { height:100%; overflow:hidden; }
+      body {
+        display:flex; height:100dvh; overflow:hidden;
+      }
+
+      /* Desktop icon sidebar */
+      .nav-sidebar {
+        position:static;
+        width:56px; height:100%;
+        flex-direction:column; flex-shrink:0;
+        padding:12px 0; gap:4px;
+        border-bottom:none; border-right:1px solid var(--border);
+      }
+      .nav-logo { font-size:1.2rem; margin-bottom:16px; }
+      .nav-title { display:none; }
+      .nav-chat-btn { display:none; }
+      .nav-spacer { flex:1; }
+      .nav-icon {
+        width:38px; height:38px; border-radius:10px;
+        display:flex; align-items:center; justify-content:center;
+        font-size:1rem; cursor:pointer; transition:all .2s;
+        position:relative; color:var(--muted);
+      }
+      .nav-icon:hover { background:var(--s2); color:var(--text); }
+      .nav-icon.active { background:rgba(167,139,250,0.15); color:var(--accent); }
+      .nav-icon[data-tip]::after {
+        content:attr(data-tip); position:absolute;
+        left:46px; top:50%; transform:translateY(-50%);
+        background:var(--s2); border:1px solid var(--border);
+        border-radius:6px; padding:4px 10px; font-size:0.72rem;
+        white-space:nowrap; color:var(--text);
+        pointer-events:none; opacity:0; transition:opacity .2s; z-index:999;
+      }
+      .nav-icon:hover[data-tip]::after { opacity:1; }
+      .nav-sep { display:block; width:28px; height:1px; background:var(--border); margin:8px 0; }
+
+      /* Main: flex column */
+      .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+
+      /* Topbar */
+      .topbar { height:52px; padding:0 20px; }
+
+      /* Tabbar */
+      .tabbar { height:42px; padding:0 20px; }
+      .tab { font-size:0.8rem; padding:0 16px; height:40px; }
+
+      /* Search: NOT sticky on desktop */
+      .search-sticky {
+        position:static; background:none;
+        padding:0; border-bottom:none;
+      }
+
+      /* Content: scrollable */
+      .content {
+        flex:1; overflow-y:auto; padding:20px;
+        display:flex; flex-direction:column; gap:18px;
+        padding-bottom:20px;
+      }
+
+      /* Platform grid: auto-fill on desktop */
+      .platform-grid {
+        grid-template-columns:repeat(auto-fill, minmax(200px,1fr));
+        gap:12px;
+      }
+      .plat-icon { width:34px; height:34px; }
+      .plat-name { font-size:0.85rem; }
+
+      /* Job results: 2 col on desktop */
+      #jobs-container { grid-template-columns:1fr 1fr; }
+
+      /* Desktop chat sidebar */
+      .chat-sidebar {
+        width:360px; flex-shrink:0;
+        border-left:1px solid var(--border);
+        display:flex; flex-direction:column;
+        background:var(--s1);
+      }
+      .chat-sidebar .chat-header { display:flex; }
+      .chat-back-btn { display:none; }
+      .chat-sidebar .chat-messages { flex:1; overflow-y:auto; padding:14px; }
+      .chat-sidebar .chat-chips { padding:0 14px 10px; }
+      .chat-sidebar .upload-zone { margin:0 14px 10px; }
+      .chat-sidebar .chat-input-wrap { padding:12px 14px; }
+
+      /* Hide mobile-only elements */
+      .chat-overlay { display:none !important; }
+      .bottom-nav { display:none !important; }
+    }
+
+    @media (min-width:641px) and (max-width:900px) {
+      .platform-grid { grid-template-columns:repeat(3,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── MOBILE NAV / DESKTOP ICON SIDEBAR ── -->
+<nav class="nav-sidebar">
+  <!-- Desktop icons -->
+  <div class="nav-logo">👑</div>
+  <div class="nav-icon active" data-tip="Suche" onclick="setTab('suche',this)">🔍</div>
+  <div class="nav-icon" data-tip="Bewerbungen" onclick="setTab('board',this)">📋</div>
+  <div class="nav-icon" data-tip="Profil" onclick="setTab('profil',this)">👤</div>
+  <div class="nav-sep"></div>
+  <div class="nav-icon" data-tip="Excel Export" onclick="doExport()">📤</div>
+  <a href="/landing" class="nav-icon" data-tip="Startseite" style="text-decoration:none">🏠</a>
+  <!-- Mobile only -->
+  <span class="nav-title">JobQueen</span>
+  <div class="nav-spacer"></div>
+  <button class="nav-chat-btn" onclick="openChat()">💬 Assistent</button>
+</nav>
+
+<!-- ── MAIN ── -->
+<main class="main">
+
+  <div class="topbar">
+    <span class="topbar-title">👑 <span>JobQueen</span></span>
+    <div class="topbar-spacer"></div>
+    <span class="topbar-badge">● Online</span>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab active" onclick="setTab('suche',this)">🔍 Jobsuche</div>
+    <div class="tab" onclick="setTab('board',this)">📋 Bewerbungen</div>
+    <div class="tab" onclick="setTab('profil',this)">👤 Profil</div>
+  </div>
+
+  <!-- SEARCH: sticky on mobile, normal on desktop -->
+  <div class="search-sticky" id="search-sticky">
+    <div class="search-bar">
+      <div class="search-input-wrap" style="flex:2">
+        <span style="color:var(--muted);font-size:0.9rem;flex-shrink:0">🔍</span>
+        <input id="main-search" type="text" inputmode="search" autocomplete="off"
+          placeholder="Berufsbezeichnung, z.B. Immobilienkaufmann …">
+      </div>
+      <div class="search-input-wrap" style="flex:1;min-width:90px;max-width:160px">
+        <span style="color:var(--muted);font-size:0.9rem;flex-shrink:0">📍</span>
+        <input id="location-search" type="text" inputmode="search" autocomplete="off"
+          placeholder="Ort oder PLZ">
+      </div>
+      <button class="search-run" onclick="doSearch()">Suchen</button>
+    </div>
+  </div>
+
+  <!-- TAB: SUCHE -->
+  <div class="content" id="tab-suche">
+
+    <!-- Job results (empty initially) -->
+    <div id="jobs-container-wrap" style="display:none" class="gap">
+      <div class="sec-head">
+        <h2 id="results-label">Suchergebnisse</h2>
+        <a onclick="clearResults()">Zurücksetzen</a>
+      </div>
+      <div id="jobs-container"></div>
+    </div>
+
+    <!-- Platforms -->
+    <div class="gap">
+      <div class="sec-head">
+        <h2>Jobbörsen</h2>
+        <a onclick="chatMsg('Welche Jobbörse passt am besten für mich?')">Empfehlung</a>
+      </div>
+      <div class="platform-grid">
+        <div class="platform-card" onclick="platformSearch('Indeed')">
+          <div class="plat-top"><div class="plat-icon">🌐</div><div><div class="plat-name">Indeed</div><span class="plat-tag">Generalist</span></div></div>
+          <div class="plat-desc">Größte Jobsuchmaschine weltweit.</div>
+        </div>
+        <div class="platform-card" onclick="platformSearch('StepStone')">
+          <div class="plat-top"><div class="plat-icon">💼</div><div><div class="plat-name">StepStone</div><span class="plat-tag">Premium</span></div></div>
+          <div class="plat-desc">Top für Fach- und Führungskräfte.</div>
+        </div>
+        <div class="platform-card" onclick="platformSearch('LinkedIn')">
+          <div class="plat-top"><div class="plat-icon">🔗</div><div><div class="plat-name">LinkedIn</div><span class="plat-tag">Netzwerk</span></div></div>
+          <div class="plat-desc">Business-Netzwerk & Headhunting.</div>
+        </div>
+        <div class="platform-card" onclick="platformSearch('XING')">
+          <div class="plat-top"><div class="plat-icon">❎</div><div><div class="plat-name">XING</div><span class="plat-tag">DACH</span></div></div>
+          <div class="plat-desc">Karrierenetzwerk für DACH.</div>
+        </div>
+        <div class="platform-card" onclick="platformSearch('Arbeitsagentur')">
+          <div class="plat-top"><div class="plat-icon">🏛️</div><div><div class="plat-name">Arbeitsagentur</div><span class="plat-tag">Offiziell</span></div></div>
+          <div class="plat-desc">Offizielle Bundesagentur für Arbeit.</div>
+        </div>
+        <div class="platform-card" onclick="platformSearch('Jobvector')">
+          <div class="plat-top"><div class="plat-icon">🔬</div><div><div class="plat-name">Jobvector</div><span class="plat-tag">MINT</span></div></div>
+          <div class="plat-desc">Naturwissenschaften & Ingenieure.</div>
+        </div>
+        <div class="platform-card" onclick="platformSearch('Absolventa')">
+          <div class="plat-top"><div class="plat-icon">🎓</div><div><div class="plat-name">Absolventa</div><span class="plat-tag">Einsteiger</span></div></div>
+          <div class="plat-desc">Absolventen & Young Professionals.</div>
+        </div>
+        <div class="platform-card" onclick="platformSearch('Yourfirm')">
+          <div class="plat-top"><div class="plat-icon">🏭</div><div><div class="plat-name">Yourfirm</div><span class="plat-tag">Mittelstand</span></div></div>
+          <div class="plat-desc">Jobs im deutschen Mittelstand.</div>
+        </div>
+        <div class="platform-card" onclick="platformSearch('Green Jobs')">
+          <div class="plat-top"><div class="plat-icon">🌿</div><div><div class="plat-name">Green Jobs</div><span class="plat-tag">Nische</span></div></div>
+          <div class="plat-desc">Umwelt & Nachhaltigkeit.</div>
+        </div>
+        <div class="platform-card" onclick="platformSearch('Monster')">
+          <div class="plat-top"><div class="plat-icon">👾</div><div><div class="plat-name">Monster</div><span class="plat-tag">Klassiker</span></div></div>
+          <div class="plat-desc">Internationales Jobportal.</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-suche -->
+
+  <!-- TAB: BOARD -->
+  <div class="content hidden" id="tab-board">
+    <div class="sec-head"><h2>Bewerbungs-Tracker</h2><a onclick="chatMsg('Neue Bewerbung hinzufügen')">+ Neu</a></div>
+    <div class="kanban">
+      <div class="kanban-col">
+        <div class="kanban-head">Offen <span class="kanban-count">2</span></div>
+        <div class="kanban-card">Immobilienkaufmann<div class="company">Vonovia · Hannover</div></div>
+        <div class="kanban-card">Property Manager<div class="company">Patrizia AG · Hamburg</div></div>
+      </div>
+      <div class="kanban-col">
+        <div class="kanban-head">Gesendet <span class="kanban-count">1</span></div>
+        <div class="kanban-card">Sachbearbeiter Vermietung<div class="company">LEG · Düsseldorf</div></div>
+      </div>
+      <div class="kanban-col">
+        <div class="kanban-head">Interview <span class="kanban-count">1</span></div>
+        <div class="kanban-card">Wohnungsverwalter<div class="company">Gewobag · Berlin</div></div>
+      </div>
+      <div class="kanban-col">
+        <div class="kanban-head">Abgeschlossen <span class="kanban-count">0</span></div>
+        <div class="kanban-empty">Noch keine</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: PROFIL -->
+  <div class="content hidden" id="tab-profil">
+    <div class="sec-head"><h2>Mein Profil</h2></div>
+    <div id="profile-content" style="background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:18px;font-size:0.82rem;color:var(--text2);line-height:1.8">
+      Lade deinen Lebenslauf im Chat-Bereich hoch. Die KI erstellt automatisch dein Profil mit Skills, Berufserfahrung und passenden Jobtiteln.
+      <br><br>
+      <button onclick="openChat()" style="padding:9px 18px;background:var(--accent);color:#0f0f1a;border:none;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;">
+        📄 Lebenslauf hochladen
+      </button>
+    </div>
+  </div>
+
+
+</main>
+
+<!-- ══ DESKTOP CHAT SIDEBAR ══════════════════════════════════════════ -->
+<aside class="chat-sidebar" id="chat-desktop">
+  <div class="chat-header">
+    <div class="chat-avatar">👑</div>
+    <div class="chat-header-info">
+      <h3>Queen Assistent</h3>
+      <span>● bereit</span>
+    </div>
+  </div>
+  <div class="chat-messages" id="msgs-desktop"></div>
+  <div class="chat-chips">
+    <span class="q-chip" onclick="chatMsg('Jobs in Hannover suchen')">🔍 Hannover</span>
+    <span class="q-chip" onclick="chatMsg('Excel Export starten')">📤 Export</span>
+    <span class="q-chip" onclick="chatMsg('Anschreiben erstellen')">✍️ Anschreiben</span>
+    <span class="q-chip" onclick="chatMsg('CV analysieren')">📄 CV</span>
+  </div>
+  <div class="upload-zone" id="upload-zone-desktop"
+       ondrop="handleDrop(event)" ondragover="handleDragOver(event,'upload-zone-desktop')"
+       ondragleave="handleDragLeave('upload-zone-desktop')"
+       onclick="document.getElementById('cv-file').click()">
+    <div class="uz-icon">📄</div>
+    <div class="uz-text"><b>Lebenslauf hochladen</b><br>PDF/Word · drag&amp;drop</div>
+    <input type="file" id="cv-file" accept=".pdf,.doc,.docx" onchange="handleFileSelect(event)">
+  </div>
+  <div class="chat-input-wrap">
+    <textarea class="chat-input" id="chat-input-desktop"
+      placeholder="Was suchst du? …" rows="1"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg('desktop')}"
+      oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,90)+'px'"></textarea>
+    <button class="chat-send" onclick="sendMsg('desktop')">↑</button>
+  </div>
+</aside>
+
+<!-- ══ MOBILE CHAT OVERLAY ═══════════════════════════════════════════ -->
+<div class="chat-overlay" id="chat-overlay">
+  <div class="chat-header">
+    <button class="chat-back-btn" onclick="closeChat()">← Zurück</button>
+    <div class="chat-avatar">👑</div>
+    <div class="chat-header-info">
+      <h3>Queen Assistent</h3>
+      <span>● bereit</span>
+    </div>
+  </div>
+  <div class="chat-messages" id="msgs-mobile"></div>
+  <div class="chat-chips">
+    <span class="q-chip" onclick="chatMsg('Jobs in Hannover suchen')">🔍 Hannover</span>
+    <span class="q-chip" onclick="chatMsg('Excel Export starten')">📤 Export</span>
+    <span class="q-chip" onclick="chatMsg('Anschreiben erstellen')">✍️ Anschreiben</span>
+    <span class="q-chip" onclick="chatMsg('CV analysieren')">📄 CV</span>
+  </div>
+  <div class="upload-zone" id="upload-zone-mobile"
+       onclick="document.getElementById('cv-file-mobile').click()">
+    <div class="uz-icon">📄</div>
+    <div class="uz-text"><b>Lebenslauf hochladen</b><br>Tippen zum Auswählen</div>
+    <input type="file" id="cv-file-mobile" accept=".pdf,.doc,.docx" onchange="handleFileSelect(event)">
+  </div>
+  <div class="chat-input-wrap">
+    <textarea class="chat-input" id="chat-input-mobile"
+      placeholder="Frage stellen…" rows="1"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg('mobile')}"
+      oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,90)+'px'"></textarea>
+    <button class="chat-send" onclick="sendMsg('mobile')">↑</button>
+  </div>
+</div>
+
+<!-- ══ BOTTOM NAV (mobile) ═══════════════════════════════════════════ -->
+<div class="bottom-nav" id="bottom-nav">
+  <div class="bnav-item active" id="bnav-suche" onclick="setTab('suche',null)">
+    🔍<span class="bnav-label">Suche</span>
+  </div>
+  <div class="bnav-item" id="bnav-board" onclick="setTab('board',null)">
+    📋<span class="bnav-label">Jobs</span>
+  </div>
+  <div class="bnav-item" id="bnav-chat" onclick="openChat()">
+    💬<span class="bnav-label">Chat</span>
+  </div>
+  <div class="bnav-item" id="bnav-export" onclick="doExport()">
+    📤<span class="bnav-label">Export</span>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ─── TELEGRAM WEBAPP INIT ──────────────────────────────────────── */
+// Muss als Erstes laufen, damit initDataUnsafe verlaesslich befuellt ist.
+const _tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+if (_tg) {
+  try { _tg.ready(); } catch(_) {}
+  try { _tg.expand(); } catch(_) {}
+}
+
+/* ─── CHAT TARGETS ──────────────────────────────────────────────── */
+// Active chat target: 'desktop' or 'mobile'
+function isMobile() { return window.innerWidth <= 900; }
+
+function getMsgs(target) {
+  return document.getElementById('msgs-' + (target || (isMobile()?'mobile':'desktop')));
+}
+function getInput(target) {
+  return document.getElementById('chat-input-' + (target || (isMobile()?'mobile':'desktop')));
+}
+
+/* ─── OVERLAY ───────────────────────────────────────────────────── */
+function openChat() {
+  if (!isMobile()) return;
+  document.getElementById('chat-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  // Show greeting if no messages yet
+  const msgs = getMsgs('mobile');
+  if (msgs && msgs.children.length === 0) greet('mobile');
+}
+function closeChat() {
+  document.getElementById('chat-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* ─── TABS ──────────────────────────────────────────────────────── */
+function setTab(id, el) {
+  // content panels
+  ['suche','board','profil'].forEach(t => {
+    const c = document.getElementById('tab-' + t);
+    if (c) c.className = 'content' + (t === id ? '' : ' hidden');
+  });
+  // tabbar tabs
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-icon').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  // bottom nav
+  ['suche','board'].forEach(t => {
+    const b = document.getElementById('bnav-' + t);
+    if (b) b.classList.toggle('active', t === id);
+  });
+  // Show/hide sticky search
+  document.getElementById('search-sticky').style.display =
+    id === 'suche' ? '' : 'none';
+}
+
+/* ─── ADD MESSAGE ───────────────────────────────────────────────── */
+function addMsg(html, isUser, target) {
+  const msgs = getMsgs(target);
+  if (!msgs) return;
+  const div = document.createElement('div');
+  div.className = 'msg ' + (isUser ? 'msg-user' : 'msg-ai');
+  div.innerHTML = html;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function addMsgBoth(html, isUser) {
+  // Desktop sidebar sichtbar?
+  const deskMsgs = document.getElementById('msgs-desktop');
+  if (deskMsgs) addMsg(html, isUser, 'desktop');
+  addMsg(html, isUser, 'mobile');
+}
+
+function showTyping(target) {
+  const msgs = getMsgs(target);
+  if (!msgs) return;
+  const t = document.createElement('div');
+  t.className = 'typing'; t.id = 'typing-' + target;
+  t.innerHTML = '<span></span><span></span><span></span>';
+  msgs.appendChild(t);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function removeTyping(target) {
+  const t = document.getElementById('typing-' + target);
+  if (t) t.remove();
+}
+
+/* ─── LLM CALL ──────────────────────────────────────────────────── */
+async function callChat(message) {
+  const res = await fetch('/api/jobqueen/chat', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({message, chat_id:'jobqueen'})
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const d = await res.json();
+  return d.reply || 'Keine Antwort.';
+}
+
+async function sendMsg(target) {
+  const inp = getInput(target);
+  if (!inp) return;
+  const text = inp.value.trim();
+  if (!text) return;
+  addMsg(text, true, target);
+  inp.value = ''; inp.style.height = 'auto';
+
+  showTyping(target);
+  try {
+    const reply = await callChat(text);
+    removeTyping(target);
+    addMsg(reply, false, target);
+  } catch (e) {
+    removeTyping(target);
+    addMsg('❌ Fehler: ' + e.message, false, target);
+  }
+}
+
+function chatMsg(text) {
+  const target = isMobile() ? 'mobile' : 'desktop';
+  if (isMobile()) openChat();
+  const inp = getInput(target);
+  if (inp) { inp.value = text; sendMsg(target); }
+}
+
+/* ─── SEARCH ────────────────────────────────────────────────────── */
+let lastQuery = '';
+let lastLocation = '';
+let lastJobs     = [];
+let allJobsIndex = {};   // url/id → job (akkumuliert über alle Suchen)
+let queryHistory = [];   // [{query, platform, location}]
+
+// Echte Telegram-Chat-ID (für Datei-Versand via Bot) – mehrere Quellen probiert
+function getTgChatId() {
+  // 1) Telegram WebApp SDK – Standard-Methode
+  try {
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      const uid = tg.initDataUnsafe?.user?.id;
+      const cid = tg.initDataUnsafe?.chat?.id;
+      if (cid) return String(cid);
+      if (uid) return String(uid);
+      // 2) Fallback: rohen initData-String selbst parsen
+      // (manche WebViews befuellen initDataUnsafe verzoegert/gar nicht)
+      if (tg.initData) {
+        try {
+          const params = new URLSearchParams(tg.initData);
+          const userRaw = params.get('user');
+          if (userRaw) {
+            const userObj = JSON.parse(userRaw);
+            if (userObj?.id) return String(userObj.id);
+          }
+        } catch(_) {}
+      }
+    }
+  } catch(_) {}
+
+  // 3) Fallback: URL-Query-Parameter (falls der Bot die chat_id direkt in den Link einbaut)
+  try {
+    const qp = new URLSearchParams(window.location.search);
+    const fromUrl = qp.get('cid') || qp.get('chat_id') || qp.get('tgid') || qp.get('uid');
+    if (fromUrl) return String(fromUrl);
+  } catch(_) {}
+
+  // 4) Fallback: URL-Hash (Telegram nutzt teils #tgWebAppData=...)
+  try {
+    if (window.location.hash && window.location.hash.includes('user')) {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const tgData = hashParams.get('tgWebAppData');
+      if (tgData) {
+        const innerParams = new URLSearchParams(tgData);
+        const userRaw = innerParams.get('user');
+        if (userRaw) {
+          const userObj = JSON.parse(userRaw);
+          if (userObj?.id) return String(userObj.id);
+        }
+      }
+    }
+  } catch(_) {}
+
+  return null;
+}
+
+// Debug-Helfer: zeigt im Browser-Devtools-Log warum die Erkennung scheitert
+function _debugTgDetection() {
+  const tg = window.Telegram?.WebApp;
+  console.log('[JobQueen] Telegram SDK geladen:', !!tg);
+  if (tg) {
+    console.log('[JobQueen] initDataUnsafe:', tg.initDataUnsafe);
+    console.log('[JobQueen] initData (raw):', tg.initData ? tg.initData.slice(0,200) : '(leer)');
+    console.log('[JobQueen] platform:', tg.platform, '| version:', tg.version);
+  }
+  console.log('[JobQueen] erkannte chat_id:', getTgChatId());
+}
+
+async function doSearch() {
+  const q    = document.getElementById('main-search').value.trim();
+  const loc  = document.getElementById('location-search').value.trim();
+  if (!q) {
+    document.getElementById('main-search').focus();
+    return;
+  }
+  lastQuery    = q;
+  lastLocation = loc;
+
+  const wrap      = document.getElementById('jobs-container-wrap');
+  const container = document.getElementById('jobs-container');
+  const label     = document.getElementById('results-label');
+  wrap.style.display = '';
+  const locLabel = loc ? ` in ${loc}` : '';
+  container.innerHTML = `<div class="search-loading"><div class="spinner"></div>Suche bei der Bundesagentur für Arbeit${locLabel}…</div>`;
+  if (label) label.textContent = `Suchergebnisse für „${q}"${locLabel}`;
+
+  if (isMobile()) setTimeout(() => wrap.scrollIntoView({behavior:'smooth', block:'start'}), 100);
+
+  try {
+    const res = await fetch('/api/jobqueen/jobs', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        query:    q,
+        location: loc,
+        chat_id:  'jobqueen',
+        limit:    25,
+        page:     1
+      })
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'API-Fehler');
+    }
+
+    const jobs = data.jobs || [];
+    lastJobs = jobs;
+    jobs.forEach(j => { const k=(j.url||j.id||'').trim(); if(k) allJobsIndex[k]=j; });
+    queryHistory.push({ query: q, platform: 'Bundesagentur für Arbeit', location: loc });
+
+    if (jobs.length > 0) {
+      renderJobs(jobs, 'Bundesagentur für Arbeit');
+      const srcLabel = data.source === 'bundesagentur'
+        ? ' (Bundesagentur für Arbeit)'
+        : '';
+      addMsgBoth(
+        `✅ <b>${jobs.length} Stellen</b> für „${q}"${locLabel}${srcLabel}. ` +
+        `✔ Haken = in Excel aufnehmen.`, false
+      );
+    } else {
+      // Echter Leer-Zustand – kein LLM-Fallback, kein Dummy
+      const hint = data.hint || '';
+      container.innerHTML =
+        `<div class="search-loading" style="flex-direction:column;gap:12px;text-align:center;padding:32px 16px">` +
+        `<span style="font-size:2rem">🔍</span>` +
+        `<b>Keine Stellenangebote gefunden</b>` +
+        `<span style="color:var(--muted);font-size:0.82rem">` +
+        `Für „${escHtml(q)}"${locLabel ? ' in ' + escHtml(loc) : ''} wurden bei der Bundesagentur für Arbeit keine Treffer gefunden.` +
+        (hint ? `<br><i>${escHtml(hint)}</i>` : '') +
+        `<br><br>Tipp: Andere Schreibweise, weiteren Suchradius oder direkt eine Jobbörse unten verwenden.` +
+        `</span></div>`;
+    }
+  } catch (e) {
+    console.error('doSearch Fehler:', e.message);
+    container.innerHTML =
+      `<div class="search-loading" style="flex-direction:column;gap:10px;text-align:center;padding:32px 16px">` +
+      `<span style="font-size:2rem">⚠️</span>` +
+      `<b>Suche momentan nicht erreichbar</b>` +
+      `<span style="color:var(--muted);font-size:0.82rem">` +
+      `Die Verbindung zur Bundesagentur für Arbeit konnte nicht hergestellt werden.<br>` +
+      `Bitte nutze die Jobbörsen-Links unten oder versuche es später erneut.` +
+      `</span>` +
+      `<button onclick="doSearch()" style="margin-top:8px;padding:8px 18px;background:var(--accent);color:#0f0f1a;border:none;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer">` +
+      `↺ Erneut versuchen</button>` +
+      `</div>`;
+  }
+}
+
+function clearResults() {
+  document.getElementById('jobs-container-wrap').style.display = 'none';
+  document.getElementById('main-search').value = '';
+  document.getElementById('location-search').value = '';
+  lastJobs = []; lastQuery = ''; lastLocation = '';
+  allJobsIndex = {}; queryHistory = [];
+  const tb = document.getElementById('job-select-toolbar'); if(tb) tb.remove();
+}
+
+function dateAgeLabel(s) {
+  if (!s) return '';
+  try {
+    const df = Math.round((new Date() - new Date(s.split('T')[0])) / 86400000);
+    if (df<=0) return '📅 Heute';
+    if (df===1) return '📅 Gestern';
+    if (df<=7) return `📅 vor ${df} Tagen`;
+    if (df<=30) return `📅 vor ${Math.round(df/7)} Wo.`;
+    return `📅 ${new Date(s.split('T')[0]).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}`;
+  } catch(_) { return s; }
+}
+
+function selectAllJobs(v) {
+  document.querySelectorAll('.job-select-cb').forEach(c=>c.checked=v);
+  updateExportCounter();
+}
+
+function updateExportCounter() {
+  const chk=document.querySelectorAll('.job-select-cb:checked').length;
+  const tot=document.querySelectorAll('.job-select-cb').length;
+  const btn=document.getElementById('export-counter-badge');
+  if(!btn) return;
+  btn.textContent=chk>0?`📤 ${chk} von ${tot} exportieren`:`📤 Export (${tot})`;
+  btn.style.color=chk>0?'var(--accent)':'var(--muted)';
+  btn.style.borderColor=chk>0?'var(--accent)':'var(--border)';
+}
+
+function renderJobs(jobs, sourceName) {
+  const c=document.getElementById('jobs-container');
+  if (!document.getElementById('job-select-toolbar')) {
+    const tb=document.createElement('div'); tb.id='job-select-toolbar';
+    tb.style.cssText='display:flex;gap:8px;align-items:center;padding:6px 0 10px;flex-wrap:wrap;border-bottom:1px solid var(--border);margin-bottom:8px';
+    tb.innerHTML=
+      '<span style="font-size:0.78rem;color:var(--muted);font-weight:600">✔ Auswahl für Excel:</span>'
+      +'<button onclick="selectAllJobs(true)" style="font-size:0.74rem;padding:3px 10px;border:1px solid var(--accent);border-radius:6px;background:transparent;color:var(--accent);cursor:pointer">✅ Alle</button>'
+      +'<button onclick="selectAllJobs(false)" style="font-size:0.74rem;padding:3px 10px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--muted);cursor:pointer">☐ Keine</button>'
+      +'<span id="export-counter-badge" onclick="doExport()" style="margin-left:auto;font-size:0.74rem;padding:4px 14px;border-radius:8px;background:var(--s2);border:1px solid var(--border);color:var(--muted);cursor:pointer;font-weight:700;transition:all .2s">📤 Export</span>';
+    c.parentElement.insertBefore(tb,c);
+  }
+  jobs.slice(0,25).forEach(j=>{
+    const jKey=(j.url||j.id||Math.random().toString(36).slice(2)).trim();
+    if(document.querySelector('[data-job-key="'+CSS.escape(jKey)+'"]')) return;
+    allJobsIndex[jKey]=j;
+    const card=document.createElement('div');
+    card.className='job-card'; card.setAttribute('data-job-key',jKey); card.style.position='relative';
+    const src=escHtml(j.source||sourceName||'');
+    const badge=src?`<span style="font-size:0.68rem;padding:2px 6px;border-radius:5px;background:rgba(212,175,55,0.14);color:var(--accent);margin-left:6px">${src}</span>`:""
+    const dAge=j.date?' · '+dateAgeLabel(j.date):'';
+    const applyBtn=j.url?`<a class="job-apply-btn" href="${escHtml(j.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 Zur Stelle →</a>`:'';
+    const clT=escHtml(j.title||'').replace(/'/g,"\\\\'"), clC=escHtml(j.company||'').replace(/'/g,"\\\\'"), clL=escHtml(j.location||'').replace(/'/g,"\\\\'");
+    const clBtn=`<span class="job-cl-btn" onclick="event.stopPropagation();chatMsg('Erstelle Anschreiben für: ${clT} bei ${clC} in ${clL}')">&#9997;&#65039; Anschreiben</span>`;
+    const sk=jKey.replace(/"/g,'&quot;'), cbId='cb_'+jKey.replace(/[^a-z0-9]/gi,'_').slice(0,28);
+    const cbHtml=`<label class="job-cb-wrap" onclick="event.stopPropagation()" title="In Excel aufnehmen" `
+      +`style="position:absolute;top:10px;right:10px;z-index:3;cursor:pointer;display:flex;align-items:center;gap:4px;background:var(--s2);border-radius:6px;padding:3px 7px;border:1px solid var(--border)">`
+      +`<input type="checkbox" id="${cbId}" class="job-select-cb" data-job-key="${sk}" checked `
+      +`onchange="updateExportCounter()" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">`
+      +`<span style="font-size:0.67rem;color:var(--muted)">Excel</span></label>`;
+    card.innerHTML=cbHtml
+      +`<div class="job-title" style="padding-right:78px">${escHtml(j.title||'—')}${badge}</div>`
+      +`<div class="job-meta">🏢 ${escHtml(j.company||'—')}${j.location?' · 📍 '+escHtml(j.location):''}${dAge}</div>`
+      +(j.description_snippet?`<div class="job-desc">${escHtml(j.description_snippet.slice(0,200))}…</div>`:'')
+      +`<div class="job-actions">${applyBtn}${clBtn}</div>`;
+    card.onclick=()=>{ if(j.url) window.open(j.url,'_blank','noopener,noreferrer'); };
+    c.appendChild(card);
+  });
+  updateExportCounter();
+}
+
+// Enter-Handler für Suche (keydown + keyup als Fallback für alle Browser/Telegram)
+['keydown','keyup'].forEach(evt=>{
+  document.getElementById('main-search').addEventListener(evt,e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doSearch();}
+  });
+  document.getElementById('location-search').addEventListener(evt,e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doSearch();}
+  });
+});
+
+function escHtml(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ─── PLATFORM SEARCH ────────────────────────────── */
+const PLATFORM_URLS={
+  'Indeed':        (q,l)=>`https://de.indeed.com/jobs?q=${enc(q)}${l?'&l='+enc(l):''}`,
+  'StepStone':     (q,l)=>`https://www.stepstone.de/work/${enc(q)}${l?'/'+enc(l):''}`,
+  'LinkedIn':      (q,l)=>`https://www.linkedin.com/jobs/search/?keywords=${enc(q)}${l?'&location='+enc(l):'&location=Deutschland'}`,
+  'XING':          (q,l)=>`https://www.xing.com/jobs/search?term=${enc(q)}${l?'&location='+enc(l):''}`,
+  'Arbeitsagentur':(q,l)=>`https://www.arbeitsagentur.de/jobsuche/suche?was=${enc(q)}${l?'&wo='+enc(l):''}`,
+  'Jobvector':     (q,l)=>`https://www.jobvector.de/jobs/${enc(q)}/${l?enc(l)+'/':''}`,
+  'Absolventa':    (q,l)=>`https://www.absolventa.de/jobs?q=${enc(q)}${l?'&location='+enc(l):''}`,
+  'Yourfirm':      (q,l)=>`https://www.yourfirm.de/stellenangebote/?q=${enc(q)}${l?'&where='+enc(l):''}`,
+  'Green Jobs':    (q,l)=>`https://greenjobs.de/jobs/?search=${enc(q)}${l?'&location='+enc(l):''}`,
+  'Monster':       (q,l)=>`https://www.monster.de/jobs/suche/?q=${enc(q)}${l?'&where='+enc(l):''}`,
+};
+function enc(s){return encodeURIComponent(s||'');}
+
+const NO_API_PLATFORMS=new Set(['Monster','Absolventa','Yourfirm','Green Jobs']);
+
+async function platformSearch(name){
+  const q=(document.getElementById('main-search').value||lastQuery||'').trim();
+  const loc=(document.getElementById('location-search').value||lastLocation||'').trim();
+  if(!q){
+    addMsgBoth(`⚠️ Bitte zuerst Suchbegriff eingeben, dann <b>${escHtml(name)}</b> klicken.`,false);
+    if(isMobile()) openChat(); return;
+  }
+  lastQuery=q; lastLocation=loc;
+  queryHistory.push({query:q,platform:name,location:loc});
+  const wrap=document.getElementById('jobs-container-wrap');
+  const container=document.getElementById('jobs-container');
+  const label=document.getElementById('results-label');
+  wrap.style.display='';
+  const locLabel=loc?` in ${loc}`:'';
+  container.innerHTML=`<div class="search-loading"><div class="spinner"></div>Suche bei <b>${escHtml(name)}</b>${locLabel}…</div>`;
+  if(label) label.textContent=`${name}: „${q}“${locLabel}`;
+  if(isMobile()) setTimeout(()=>wrap.scrollIntoView({behavior:'smooth',block:'start'}),100);
+
+  // Plattformen ohne API → direkt Hinweis zeigen
+  if(NO_API_PLATFORMS.has(name)){
+    const urlFn=PLATFORM_URLS[name];
+    container.innerHTML=
+      `<div class="search-loading" style="flex-direction:column;gap:12px;text-align:center;padding:32px 16px">`
+      +`<span style="font-size:2.2rem">🔒</span>`
+      +`<b>${escHtml(name)} erfordert Login / blockiert automatische Suche</b>`
+      +`<span style="color:var(--muted);font-size:0.82rem">Direkt auf der Plattform suchen:</span>`
+      +(urlFn?`<button onclick="window.open(PLATFORM_URLS['${name}'](lastQuery,lastLocation),'_blank','noopener')" `
+        +`style="margin-top:8px;padding:8px 18px;background:var(--accent);color:#0f0f1a;border:none;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer">`
+        +`🔗 ${escHtml(name)} öffnen</button>`:'')
+      +`</div>`;
+    addMsgBoth(`🔒 <b>${escHtml(name)}</b> blockiert automatische Suche. Klicke den Button um direkt zu suchen.`,false);
+    return;
+  }
+
+  try{
+    const res=await fetch('/api/jobqueen/platform-jobs',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({query:q,location:loc,platform:name,chat_id:'jobqueen'})
+    });
+    const data=await res.json();
+    if(!res.ok||data.error) throw new Error(data.error||'API-Fehler');
+    const jobs=data.jobs||[];
+    lastJobs=jobs;
+    jobs.forEach(j=>{const k=(j.url||j.id||'').trim();if(k) allJobsIndex[k]=j;});
+    if(jobs.length>0){
+      renderJobs(jobs,name);
+      addMsgBoth(`✅ <b>${jobs.length} Stellen</b> für „${escHtml(q)}“${locLabel} bei <b>${escHtml(name)}</b>. ✔ Haken = Excel.`,false);
+    } else {
+      const urlFn=PLATFORM_URLS[name];
+      container.innerHTML=
+        `<div class="search-loading" style="flex-direction:column;gap:12px;text-align:center;padding:32px 16px">`
+        +`<span style="font-size:2rem">🔍</span>`
+        +`<b>Keine Treffer bei ${escHtml(name)} für „${escHtml(q)}“${locLabel}</b>`
+        +(urlFn?`<button onclick="window.open(PLATFORM_URLS['${name}'](lastQuery,lastLocation),'_blank','noopener')" `
+          +`style="margin-top:8px;padding:8px 18px;background:var(--accent);color:#0f0f1a;border:none;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer">`
+          +`🔗 Direkt auf ${escHtml(name)} suchen</button>`:'')
+        +`</div>`;
+    }
+  } catch(e){
+    console.error('platformSearch:',e.message);
+    const urlFn=PLATFORM_URLS[name];
+    container.innerHTML=
+      `<div class="search-loading" style="flex-direction:column;gap:10px;text-align:center;padding:32px 16px">`
+      +`<span style="font-size:2rem">⚠️</span>`
+      +`<b>Suche bei ${escHtml(name)} fehlgeschlagen</b>`
+      +`<span style="color:var(--muted);font-size:0.82rem">${escHtml(e.message)}</span>`
+      +(urlFn?`<button onclick="window.open(PLATFORM_URLS['${name}'](lastQuery,lastLocation),'_blank','noopener')" `
+        +`style="margin-top:8px;padding:8px 18px;background:var(--accent);color:#0f0f1a;border:none;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer">`
+        +`🔗 ${escHtml(name)} direkt öffnen</button>`:'')
+      +`</div>`;
+  }
+}
+
+/* ─── EXPORT ───────────────────────────────────── */
+async function doExport(){
+  const q=(document.getElementById('main-search').value||lastQuery||'').trim();
+  if(!q && Object.keys(allJobsIndex).length===0){
+    addMsgBoth('⚠️ Bitte zuerst nach Jobs suchen, dann exportieren.',false);
+    if(isMobile()) openChat(); return;
+  }
+  const selectedIds=[];
+  document.querySelectorAll('.job-select-cb:checked').forEach(cb=>selectedIds.push(cb.getAttribute('data-job-key')));
+  const useAll=selectedIds.length===0;
+  const exportJobs=useAll?Object.values(allJobsIndex):selectedIds.map(k=>allJobsIndex[k]).filter(Boolean);
+  if(exportJobs.length===0){addMsgBoth('⚠️ Keine Jobs ausgewaehlt.',false);return;}
+  const lbl=useAll?`allen ${exportJobs.length}`:`${exportJobs.length} ausgewaehlten`;
+
+  const tgChatId = getTgChatId();
+  _debugTgDetection(); // Loggt Details in die Browser-Konsole (F12) zur Diagnose
+
+  if (!tgChatId) {
+    addMsgBoth(
+      `⚠️ <b>Telegram-Chat konnte nicht erkannt werden.</b><br>`
+      +`Bitte oeffne JobQueen ausschliesslich ueber den Bot-Button in Telegram `
+      +`(nicht als normaler Browser-Link). Falls das Problem bestehen bleibt, `
+      +`sende mir bitte einmal <code>/jobqueen</code> direkt im Chat und versuche es erneut.`,
+      false
+    );
+  }
+
+  addMsgBoth(`📤 Erstelle Export mit ${lbl} Jobs…`,false);
+
+  try{
+    const res=await fetch('/api/jobqueen/excel',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        query:q||'Jobsuche',chat_id:'jobqueen',
+        tg_chat_id: tgChatId ? String(tgChatId) : null,
+        jobs:exportJobs,
+        selected_ids:useAll?null:selectedIds,
+        all_queries:[...new Set(queryHistory.map(r=>r.query))]
+      })
+    });
+
+    if(!res.ok){
+      const txt=await res.text();
+      let msg=`HTTP ${res.status}`;
+      try{msg=JSON.parse(txt).error||msg;}catch(_){}
+      throw new Error(msg);
+    }
+
+    const ctype=res.headers.get('Content-Type')||'';
+
+    // ── Telegram-Bot hat Dateien direkt in den Chat gesendet (Standardweg) ──
+    if(ctype.includes('application/json')){
+      const data=await res.json();
+      if(data.error) throw new Error(data.error);
+
+      if (data.telegram_sent === false) {
+        // Server hat versucht zu senden, ist aber fehlgeschlagen – Grund anzeigen
+        addMsgBoth(
+          `⚠️ <b>Telegram-Versand fehlgeschlagen:</b><br>`
+          +`<span style='font-size:0.8rem;color:var(--muted)'>${escHtml(data.telegram_error||'Unbekannter Fehler')}</span><br>`
+          +`Bitte sende dem Bot einmal eine Nachricht (z.B. <code>/start</code>) und versuche den Export erneut.`,
+          false
+        );
+        return;
+      }
+
+      const qSet=[...new Set(queryHistory.map(r=>r.query))];
+      addMsgBoth(
+        `✅ <b>${data.count} Stellen exportiert</b> (${qSet.length} Suchanfrage(n))<br>`
+        +`📬 <b>Excel, PDF & Markdown wurden in deinen Telegram-Chat gesendet!</b><br>`
+        +`<span style='font-size:0.78rem;color:var(--muted)'>Schau in deinen Chat mit dem Bot – die Dateien sollten als Anhang erscheinen.</span>`,
+        false
+      );
+      return;
+    }
+
+    // ── Fallback: Direkter Datei-Download (nur sinnvoll ausserhalb Telegram) ──
+    const blob=await res.blob();
+    if(blob.size<200) throw new Error('Leere Datei erhalten ('+blob.size+' bytes)');
+    const today=new Date().toISOString().split('T')[0];
+    const fname=`JobQueen_Export_${today}.xlsx`;
+    const blobUrl=URL.createObjectURL(new Blob([blob],{
+      type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    }));
+
+    // In Telegrams eingebettetem WebView funktionieren blob-Downloads i.d.R. NICHT.
+    // tg.openLink() reicht die URL an den System-Browser weiter, wo es funktioniert.
+    let triedOpenLink = false;
+    try {
+      const tg = window.Telegram?.WebApp;
+      if (tg?.openLink) { tg.openLink(blobUrl); triedOpenLink = true; }
+    } catch(_) {}
+
+    if (!triedOpenLink) {
+      const a=document.createElement('a');
+      a.href=blobUrl; a.download=fname; a.style.display='none';
+      document.body.appendChild(a); a.click();
+      setTimeout(()=>{document.body.removeChild(a);},400);
+    }
+
+    const qSet=[...new Set(queryHistory.map(r=>r.query))];
+    addMsgBoth(
+      `✅ <b>${exportJobs.length} Stellen exportiert</b> (${qSet.length} Suchanfrage(n))<br>`
+      +`<a href='${blobUrl}' download='${fname}' target='_blank' `
+      +`style='display:inline-block;margin-top:6px;padding:6px 14px;`
+      +`background:var(--accent);color:#0f0f1a;border-radius:8px;`
+      +`font-weight:700;font-size:0.82rem;text-decoration:none'>`
+      +`⬇️ ${fname} herunterladen</a>`
+      +`<span style='font-size:0.72rem;color:var(--muted);display:block;margin-top:4px'>`
+      +`Falls der Klick nichts tut: Diese Seite in einem normalen Browser-Tab `
+      +`(nicht in Telegram) oeffnen – dort funktioniert der Download zuverlaessig.</span>`,
+      false
+    );
+  }catch(e){
+    addMsgBoth(`❌ Export fehlgeschlagen: ${e.message}`,false);
+    console.error('Export:',e);
+  }
+}
+
+/* ─── CV UPLOAD ─────────────────────────────────────────────────── */
+function handleDragOver(e, zoneId) {
+  e.preventDefault();
+  document.getElementById(zoneId).style.borderColor='var(--accent)';
+}
+function handleDragLeave(zoneId) {
+  document.getElementById(zoneId).style.borderColor='';
+}
+function handleDrop(e) {
+  e.preventDefault();
+  handleDragLeave('upload-zone-desktop');
+  const file = e.dataTransfer.files[0];
+  if (file) analyzeCV(file);
+}
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) analyzeCV(file);
+}
+function escapeHtml(s){return escHtml(s);} 
+
+function renderProfile(profile){
+  const el = document.getElementById('profile-content');
+  if (!el) return;
+  if (!profile || typeof profile !== 'object') {
+    el.innerHTML = '<div style="color:var(--muted);">Kein Profil vorhanden.</div>';
+    return;
+  }
+
+  const name = profile.name || '';
+  const skills = Array.isArray(profile.skills) ? profile.skills : [];
+  const languages = Array.isArray(profile.languages) ? profile.languages : [];
+  const expY = profile.experience_years ?? '';
+  const expM = profile.experience_months ?? '';
+
+  const strengths = Array.isArray(profile.strengths) ? profile.strengths : [];
+  const topStrengths = strengths.slice(0, 8);
+
+  const suggested = Array.isArray(profile.suggested_job_titles) ? profile.suggested_job_titles : [];
+  const topSuggested = suggested.slice(0, 8);
+
+  let html = '';
+  html += '<div style="display:flex;flex-direction:column;gap:10px;">';
+
+  html += '<div style="background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:12px;">';
+  html += '<div style="font-weight:800;color:var(--accent);font-size:0.85rem;margin-bottom:6px;">📋 Profil</div>';
+  html += `<div style="color:var(--text2);font-size:0.78rem;">${name ? '👤 ' + escapeHtml(name) : ''}</div>`;
+  html += '<div style="margin-top:8px;font-size:0.78rem;color:var(--text2);line-height:1.7;">';
+  html += `• Erfahrung: <b>${expY}${expY!==''?' Jahre':''}</b>${expM!==''?' & '+expM+' Monate':''}<br>`;
+  html += `• Skills: <b>${skills.length?skills.map(escapeHtml).join(' · '):'—'}</b><br>`;
+  html += `• Sprachen: <b>${languages.length?languages.map(escapeHtml).join(' · '):'—'}</b>`;
+  html += '</div>';
+  html += '</div>';
+
+  if (topStrengths.length) {
+    html += '<div style="background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px;">';
+    html += '<div style="font-weight:800;color:var(--accent);font-size:0.85rem;margin-bottom:8px;">🏆 Stärken</div>';
+    html += '<div style="font-size:0.76rem;color:var(--text2);line-height:1.6;">' +
+      topStrengths.map(s => {
+        const strength = s && s.strength ? s.strength : '';
+        const ev = s && s.evidence ? s.evidence : '';
+        const rel = s && s.relevance ? s.relevance : '';
+        return `• <b>${escapeHtml(strength)}</b><br><span style="color:var(--muted)">Beleg:</span> ${escapeHtml(ev).slice(0,240)}<br><span style="color:var(--muted)">Relevanz:</span> ${escapeHtml(rel).slice(0,220)}<br><br>`;
+      }).join('');
+    html += '</div>';
+    html += '</div>';
+  }
+
+  if (topSuggested.length) {
+    html += '<div style="background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px;">';
+    html += '<div style="font-weight:800;color:var(--accent);font-size:0.85rem;margin-bottom:8px;">🎯 Passende Jobtitel</div>';
+    html += '<div style="font-size:0.76rem;color:var(--text2);line-height:1.6;">' +
+      topSuggested.map(j => {
+        const t = j && j.title ? j.title : '';
+        const r = j && j.reason ? j.reason : '';
+        return `• <b>${escapeHtml(t)}</b><br><span style="color:var(--muted)">Warum:</span> ${escapeHtml(r).slice(0,220)}<br><br>`;
+      }).join('');
+    html += '</div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function analyzeCV(file) {
+  const target = isMobile() ? 'mobile' : 'desktop';
+  const chat_id = 'jobqueen';
+
+  addMsg(`📄 <b>${escHtml(file.name)}</b> wird analysiert…`, true, target);
+  showTyping(target);
+
+  // Live-Stream-Vorschau im Profil-Bereich einblenden
+  const profileEl = document.getElementById('profile-content');
+  if (profileEl) {
+    profileEl.innerHTML = `
+      <div id="cv-stream-box"
+           style="background:var(--s2);border:1px solid var(--border);border-radius:10px;
+                  padding:12px;font-size:0.7rem;color:var(--muted);font-family:monospace;
+                  white-space:pre-wrap;line-height:1.45;max-height:240px;overflow:hidden;
+                  word-break:break-all;">⚙️ Analyse läuft…</div>`;
+  }
+
+  const fd = new FormData();
+  fd.append('chat_id', chat_id);
+  fd.append('file', file);
+  fd.append('filename', file.name);
+
+  // Streaming-Endpoint nutzen
+  fetch('/api/jobqueen/cv/stream', { method: 'POST', body: fd })
+    .then(async res => {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf      = '';
+      let rawJson  = '';
+      let done     = false;
+
+      while (!done) {
+        const { done: doneFlag, value } = await reader.read();
+        if (doneFlag) break;
+
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop(); // unvollständige Zeile aufheben
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          let evt;
+          try { evt = JSON.parse(line.slice(6)); } catch { continue; }
+
+          // Chunk: JSON wächst → Vorschau aktualisieren
+          if (evt.chunk !== undefined) {
+            rawJson += evt.chunk;
+            const box = document.getElementById('cv-stream-box');
+            if (box) {
+              // Zeige letzten Abschnitt des aufgebauten JSON
+              box.textContent = '⚙️ Analysiere…\n\n' + rawJson.slice(-320);
+            }
+          }
+
+          // Fertig: Profil rendern und Tab wechseln
+          if (evt.done && evt.profile) {
+            done = true;
+            removeTyping(target);
+            addMsg('✅ <b>CV-Analyse abgeschlossen.</b> Profil wurde aktualisiert.', false, target);
+            renderProfile(evt.profile);
+            // Profil-Tab aktivieren
+            setTab('profil', null);
+          }
+
+          if (evt.error) throw new Error(evt.error);
+        }
+      }
+    })
+    .catch(e => {
+      removeTyping(target);
+      addMsg('❌ CV-Analyse fehlgeschlagen: ' + e.message, false, target);
+      const profileEl2 = document.getElementById('profile-content');
+      if (profileEl2) profileEl2.innerHTML =
+        `<div style="color:var(--red);font-size:0.8rem;padding:12px;">❌ ${escHtml(e.message)}</div>`;
+    });
+}
+
+
+/* ─── GREETING ──────────────────────────────────────────────────── */
+function greet(target) {
+  addMsg(`Willkommen 👑<br><br>Ich durchsuche <b>20+ Jobbörsen</b> für dich und helfe mit Anschreiben, CV-Analyse und Excel-Export.<br><br>Was suchst du heute?`, false, target);
+}
+
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    greet('desktop');
+    // mobile greeting added on openChat()
+  }, 300);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y \
+    git \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir --upgrade pip
+
+# Torch CPU
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+# Requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Bot Code
+COPY . .
+
+EXPOSE 8080
+
+# ✅ Fix – main.py liest PORT selbst via os.getenv()
+CMD ["python", "main.py"]

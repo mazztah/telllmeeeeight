@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Queen Voice</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { background:#111; color:white; font-family:system-ui, -apple-system, sans-serif; text-align:center; padding:15px; touch-action: manipulation; }
+h2 { margin-top:0; font-size:1.6rem; }
+#chat { height:280px; overflow-y:auto; border:1px solid #333; padding:10px; margin:10px 0; border-radius:8px; text-align:left; font-size:0.95rem; }
+.user { color:#4CAF50; }
+.bot { color:#00BCD4; }
+#btn { padding:16px 36px; font-size:1.1rem; font-weight:bold; color:#111; background:#ff66cc; border:none; border-radius:50px; cursor:pointer; box-shadow:0 4px 12px rgba(255,102,204,0.35); transition: transform 0.1s, opacity 0.2s; }
+#btn:active { transform: scale(0.96); }
+#btn:disabled { opacity: 0.5; cursor: not-allowed; }
+#status { margin:10px 0; font-size:0.95rem; min-height:24px; color:#aaa; }
+</style>
+</head>
+<body>
+
+<h2>👑 Voice Chat</h2>
+<div id="status">Tippe auf START, um den Voice-Chat zu beginnen.</div>
+<div id="chat"></div>
+<button id="btn">🎤 START</button>
+
+<script>
+let ws;
+let mediaRecorder;
+let audioChunks = [];
+let isListening = false;
+let recorderMimeType = '';
+
+let currentAudio = null;
+let audioContext, analyser, dataArray;
+let silenceTimer = null;
+let isRecordingSpeech = false;
+
+const SILENCE_TIMEOUT = 1200;
+const VOLUME_THRESHOLD = -45;
+
+function addMessage(text, cls) {
+    const div = document.createElement("div");
+    div.className = cls;
+    div.innerText = text;
+    document.getElementById("chat").appendChild(div);
+    document.getElementById("chat").scrollTop = document.getElementById("chat").scrollHeight;
+}
+
+function getSupportedMimeType() {
+    const types = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+        'audio/ogg'
+    ];
+    for (const t of types) {
+        if (MediaRecorder.isTypeSupported(t)) {
+            console.log('✅ MediaRecorder supported:', t);
+            return t;
+        }
+    }
+    console.warn('⚠️ Kein spezifischer MIME-Type supported, nehme Standard');
+    return '';
+}
+
+async function ensureAudioContext() {
+    if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioContext.state === 'suspended') {
+        try {
+            await audioContext.resume();
+            console.log('🔓 AudioContext resumed');
+        } catch (e) {
+            console.error('AudioContext resume failed:', e);
+        }
+    }
+}
+
+function connectWS() {
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    ws = new WebSocket(`${protocol}//${location.host}/ws/miniapp`);
+    ws.binaryType = 'blob';
+
+    ws.onopen = () => {
+        console.log('🔌 WebSocket verbunden');
+        document.getElementById('status').textContent = "🟢 Verbunden – ich höre zu...";
+    };
+
+    ws.onmessage = async (event) => {
+        await ensureAudioContext();
+
+        if (event.data instanceof Blob) {
+            if (currentAudio) {
+                currentAudio.pause();
+            }
+            const blob = event.data.type ? event.data : new Blob([event.data], { type: 'audio/mpeg' });
+            currentAudio = new Audio(URL.createObjectURL(blob));
+            currentAudio.play().catch(e => console.error('Audio play failed:', e));
+            return;
+        }
+
+        if (event.data instanceof ArrayBuffer) {
+            if (currentAudio) currentAudio.pause();
+            currentAudio = new Audio(URL.createObjectURL(new Blob([event.data], { type: 'audio/mpeg' })));
+            currentAudio.play().catch(e => console.error('Audio play failed:', e));
+            return;
+        }
+
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === "user") {
+                addMessage("Du: " + data.text, "user");
+            }
+            if (data.type === "bot") {
+                addMessage("Bot: " + data.text, "bot");
+            }
+        } catch (e) {
+            console.log("Unbekannte Nachricht:", event.data);
+        }
+    };
+
+    ws.onclose = () => {
+        document.getElementById('status').textContent = "🔴 Verbindung getrennt – lade neu...";
+        setTimeout(() => location.reload(), 3000);
+    };
+
+    ws.onerror = (err) => {
+        console.error("WS Error", err);
+        document.getElementById('status').textContent = "❌ Verbindungsfehler";
+    };
+}
+
+function clearSilence() {
+    if (silenceTimer) {
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+    }
+}
+
+function startSilence() {
+    clearSilence();
+    silenceTimer = setTimeout(() => {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            isRecordingSpeech = false;
+        }
+    }, SILENCE_TIMEOUT);
+}
+
+function checkVolume() {
+    if (!isListening || !analyser) return;
+    analyser.getByteFrequencyData(dataArray);
+    const avg = dataArray.reduce((a,b)=>a+b)/dataArray.length;
+    const volume = avg/255;
+    const db = 20 * Math.log10(volume + 0.001);
+
+    if (db > VOLUME_THRESHOLD) {
+        if (ws && ws.readyState === 1) {
+            ws.send(JSON.stringify({type:"interrupt"}));
+        }
+        if (!isRecordingSpeech) {
+            isRecordingSpeech = true;
+            mediaRecorder.start();
+        }
+        clearSilence();
+    } else if (isRecordingSpeech) {
+        startSilence();
+    }
+    requestAnimationFrame(checkVolume);
+}
+
+async function start() {
+    const btn = document.getElementById("btn");
+    btn.disabled = true;
+    btn.textContent = "⏳ Starte...";
+
+    try {
+        recorderMimeType = getSupportedMimeType();
+        connectWS();
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
+
+        await ensureAudioContext();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        const options = recorderMimeType ? { mimeType: recorderMimeType } : {};
+        mediaRecorder = new MediaRecorder(stream, options);
+
+        mediaRecorder.ondataavailable = (e)=>{
+            if (e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = ()=>{
+            if (audioChunks.length > 0) {
+                const blobType = recorderMimeType || 'audio/webm';
+                const blob = new Blob(audioChunks, {type: blobType});
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(blob);
+                }
+                audioChunks = [];
+            }
+            // Sauberes Neustarten nach kurzem Delay
+            if (mediaRecorder && mediaRecorder.state !== 'recording' && isListening) {
+                setTimeout(() => {
+                    try { mediaRecorder.start(); } catch(e) { console.error('Restart failed', e); }
+                }, 150);
+            }
+        };
+
+        requestAnimationFrame(checkVolume);
+        btn.classList.add('hidden');
+        document.getElementById('status').textContent = "🟢 Dauerhaft aktiv – ich höre zu...";
+
+    } catch (err) {
+        console.error(err);
+        let msg = "❌ Mikrofon-Zugriff verweigert";
+        if (err.name === 'NotAllowedError') msg = "❌ Mikrofon-Berechtigung verweigert. Bitte in den Einstellungen erlauben.";
+        if (err.name === 'NotFoundError') msg = "❌ Kein Mikrofon gefunden.";
+        document.getElementById('status').textContent = msg;
+        btn.disabled = false;
+        btn.textContent = "🎤 Erneut versuchen";
+    }
+}
+
+document.getElementById("btn").onclick = ()=>{
+    if (!isListening) {
+        isListening = true;
+        start();
+    } else {
+        location.reload();
+    }
+};
+</script>
+
+</body>
+</html>
+

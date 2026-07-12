@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Viewer - telllmeeedrei</title>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+    <style>
+        body { 
+            margin:0; padding:0; 
+            background: #111; 
+            overflow: hidden; 
+            font-family: -apple-system, sans-serif;
+            color: white;
+        }
+        model-viewer {
+            width: 100vw;
+            height: 100vh;
+            background-color: #1a1a1a;
+            --poster-color: #111;
+        }
+        .info {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(0,0,0,0.7);
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            padding: 12px 24px;
+            border-radius: 24px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+@media (max-width: 480px) {
+            .info { font-size: 12px; padding: 10px 12px; }
+            .controls { font-size: 11px; padding: 8px 16px; }
+            .overlay { font-size: 16px; padding: 40px 20px; }
+        }
+
+        /* New styles for loading/error/upload */
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(135deg, #1a1a1a 0%, #111 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 1000; backdrop-filter: blur(4px);
+            font-size: 20px; text-align: center; padding: 60px 40px;
+        }
+        .loading { color: #4ade80; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+        .error { color: #ef4444; }
+        #fileInput { display: none; }
+        .upload-area {
+            border: 3px dashed #4ade80; border-radius: 16px; padding: 40px;
+            background: rgba(74,222,128,0.1); color: #4ade80; margin: 20px;
+            transition: all 0.3s; cursor: pointer;
+        }
+        .upload-area.dragover { background: rgba(74,222,128,0.3); border-color: #22c55e; }
+        .controls-row { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; justify-content: center; }
+        .btn { 
+            background: rgba(0,0,0,0.7); color: white; border: none; 
+            padding: 10px 20px; border-radius: 20px; cursor: pointer; 
+            font-size: 14px; backdrop-filter: blur(10px); transition: 0.2s;
+        }
+        .btn:hover { background: rgba(59,130,246,0.9); }
+        .model-name { font-size: 16px; margin-top: 20px; color: #60a5fa; }
+    </style>
+
+</head>
+<body>
+    <model-viewer 
+        id="viewer"
+        src="" 
+        alt="Loading 3D model..."
+        auto-rotate
+        camera-controls
+        shadow-intensity="1"
+        exposure="1"
+        environment-intensity="1"
+        touch-action="pan-y"
+        loading="eager">
+    </model-viewer>
+
+    <div class="info">
+        <strong>🧊 3D Viewer</strong><br>
+        Auto-Drehung • Finger=360° Drehen • Pinch=Zoom
+    </div>
+
+    <div class="controls">
+        👆 Ziehen=Drehen • Doppel-Tap=Reset • Auto-Rotation
+    </div>
+
+    <!-- New UI overlays -->
+    <div id="loadingOverlay" class="overlay" style="display: none;">
+        <div class="loading">⏳ Loading 3D Model...</div>
+        <div style="font-size: 14px; color: #94a3b8; margin-top: 12px;">Wait for auto-rotate to start</div>
+    </div>
+
+    <div id="errorOverlay" class="overlay" style="display: none;">
+        <div class="error">❌ No 3D Model Loaded</div>
+        <div style="font-size: 14px; color: #94a3b8; margin-top: 12px;">
+            Drag GLB file here or click <strong>Load Local File</strong><br>
+            Or use ?file=model.glb in URL
+        </div>
+        <input type="file" id="fileInput" accept=".glb,.gltf">
+        <div id="uploadArea" class="upload-area">📁 Drop GLB file here or click to browse</div>
+        <div class="controls-row">
+            <button class="btn" onclick="loadLocalFile()">Load Local</button>
+            <button class="btn" onclick="scanLocalModels()">Scan Folder</button>
+            <button class="btn" onclick="resetViewer()">Reset</button>
+        </div>
+    </div>
+
+    <div id="loadedOverlay" class="overlay" style="display: none;">
+        <div>✅ Model Loaded!</div>
+        <div id="modelName" class="model-name"></div>
+        <div class="controls-row">
+            <button class="btn" onclick="viewer.play()">Play Animation</button>
+            <button class="btn" onclick="viewer.pause()">Pause</button>
+            <button class="btn" onclick="resetViewer()">Reset View</button>
+        </div>
+    </div>
+
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const modelUrl = urlParams.get('url');
+        const fileParam = urlParams.get('file');
+        const viewer = document.getElementById('viewer');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const errorOverlay = document.getElementById('errorOverlay');
+        const loadedOverlay = document.getElementById('loadedOverlay');
+        const modelNameEl = document.getElementById('modelName');
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        let currentModelUrl = null;
+
+        // Show overlay helper
+        function showOverlay(id) {
+            loadingOverlay.style.display = id === 'loading' ? 'flex' : 'none';
+            errorOverlay.style.display = id === 'error' ? 'flex' : 'none';
+            loadedOverlay.style.display = id === 'loaded' ? 'flex' : 'none';
+            viewer.style.opacity = id === 'viewer' ? '1' : '0.1';
+        }
+
+        // Load model function
+        async function loadModel(url, name = 'Model') {
+            showOverlay('loading');
+            currentModelUrl = url;
+            modelNameEl.textContent = name;
+            viewer.src = url;
+
+            viewer.addEventListener('load', () => {
+                showOverlay('loaded');
+                console.log('Model loaded:', name, url);
+            }, { once: true });
+
+            viewer.addEventListener('error', () => {
+                showOverlay('error');
+                console.error('Model load failed:', url);
+            }, { once: true });
+
+            // Fallback timeout
+            setTimeout(() => {
+                if (loadingOverlay.style.display !== 'none') {
+                    showOverlay('error');
+                }
+            }, 10000);
+        }
+
+        // Local file load
+        async function loadLocalFile() {
+            fileInput.click();
+        }
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file && (file.name.endsWith('.glb') || file.name.endsWith('.gltf'))) {
+                const url = URL.createObjectURL(file);
+                loadModel(url, file.name);
+            }
+        });
+
+        // Drag & drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(event => {
+            uploadArea.addEventListener(event, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+
+        uploadArea.addEventListener('dragover', () => uploadArea.classList.add('dragover'));
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', (e) => {
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && (file.name.endsWith('.glb') || file.name.endsWith('.gltf'))) {
+                const url = URL.createObjectURL(file);
+                loadModel(url, file.name);
+            }
+        });
+        uploadArea.addEventListener('click', loadLocalFile);
+
+        // Scan local models dir
+        async function scanLocalModels() {
+            try {
+                // Try common local paths relative to html
+                const paths = ['model.glb', 'static/model.glb', 'models/model.glb', 'test.glb'];
+                for (let path of paths) {
+                    try {
+                        const response = await fetch(path);
+                        if (response.ok) {
+                            loadModel(path, path);
+                            return;
+                        }
+                    } catch {}
+                }
+                showOverlay('error');
+            } catch {
+                showOverlay('error');
+            }
+        }
+
+        // Reset
+        function resetViewer() {
+            viewer.resetTurntable();
+            if (currentModelUrl) loadModel(currentModelUrl);
+        }
+
+        // postMessage from backend
+        window.addEventListener('message', (e) => {
+            if (e.data.type === 'loadGLB') {
+                const glbBase64 = e.data.glbBase64;
+                const filename = e.data.filename || 'model.glb';
+                if (glbBase64) {
+                    const binary = atob(glbBase64);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    const blob = new Blob([bytes], { type: 'model/gltf-binary' });
+                    const url = URL.createObjectURL(blob);
+                    loadModel(url, filename);
+                }
+            }
+        });
+
+        // Init
+        async function init() {
+            if (modelUrl) {
+                loadModel(modelUrl, 'Remote Model');
+            } else if (fileParam) {
+                loadModel(fileParam, fileParam);
+            } else {
+                await scanLocalModels();
+            }
+        }
+
+        init();
+    </script>
+
+</body>
+</html>

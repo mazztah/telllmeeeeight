@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎩 Hütchenspiel Deluxe - Nuss erraten!</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.167.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.167.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: radial-gradient(circle at center, #1a0a2e 0%, #0d001a 70%, #000 100%);
+            overflow: hidden; font-family: 'Georgia', serif; color: #e6d5ff;
+            perspective: 1000px;
+        }
+        canvas { display: block; }
+        #ui {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 100;
+        }
+        #title {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            font-size: clamp(24px, 5vw, 48px); font-weight: bold;
+            text-shadow: 0 0 30px #8833ff, 0 0 60px #aa55ff; animation: glow 3s infinite;
+        }
+        @keyframes glow { 0%,100%{text-shadow: 0 0 20px #8833ff, 0 0 40px #aa55ff;} 50%{text-shadow: 0 0 40px #8833ff, 0 0 80px #aa55ff;} }
+        #money { position: absolute; top: 20px; right: 20px; font-size: 28px; font-weight: bold; }
+        #balance { color: #ffd700; text-shadow: 0 0 15px #ffd700; }
+        #stats { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); font-size: 18px; text-align: center; }
+        #hutButtons {
+            position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 20px; pointer-events: auto;
+        }
+        .hut-btn {
+            width: 120px; height: 80px; background: linear-gradient(145deg, #2a1a4a, #1a0a2e);
+            border: 3px solid #8833ff; border-radius: 15px; color: #e6d5ff;
+            font-size: 20px; font-weight: bold; cursor: pointer; transition: all 0.3s;
+            box-shadow: 0 10px 30px rgba(136,51,255,0.4); backdrop-filter: blur(10px);
+        }
+        .hut-btn:hover:not(:disabled) { 
+            transform: translateY(-5px); box-shadow: 0 15px 40px rgba(136,51,255,0.6);
+            border-color: #aa55ff; background: linear-gradient(145deg, #3a2a5a, #2a1a4e);
+        }
+        .hut-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .hut-btn.active { border-color: #ffd700; box-shadow: 0 0 30px #ffd700; }
+        #spinStatus { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            font-size: 36px; font-weight: bold; display: none; text-shadow: 0 0 20px #ff4488;
+        }
+        #tip { 
+            position: absolute; top: 70px; right: 20px; background: rgba(0,0,0,0.8);
+            padding: 12px 20px; border-radius: 20px; font-size: 16px; display: none;
+            border: 2px solid #44ff88; box-shadow: 0 0 20px rgba(68,255,136,0.5);
+        }
+        #gameOver {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            background: linear-gradient(45deg, #1a0033, #330066); padding: 40px;
+            border-radius: 25px; font-size: 32px; text-align: center; display: none;
+            border: 4px solid #ffd700; box-shadow: 0 0 60px #ffd700;
+        }
+        .neon-glow { animation: neon-glow 2s infinite alternate; }
+        @keyframes neon-glow { 0%{ box-shadow: 0 0 20px #8833ff; } 100%{ box-shadow: 0 0 40px #aa55ff, 0 0 60px #8833ff; } }
+        @media (max-width: 768px) { #hutButtons { flex-direction: column; gap: 10px; bottom: 20px; } }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <div id="title" class="neon-glow">🎩 HÜTCHENSPIEL DELUXE 🎩</div>
+        <div id="money">
+            <div>💰 <span id="balance" class="neon-glow">500</span></div>
+            <div>Wetten: <span id="betAmount">10</span></div>
+        </div>
+        
+        <div id="hutButtons">
+            <button class="hut-btn" id="hut1">HUT 1</button>
+            <button class="hut-btn" id="hut2">HUT 2</button>
+            <button class="hut-btn" id="hut3">HUT 3</button>
+        </div>
+        
+        <div id="spinStatus">Mischen... 🎲</div>
+        <div id="tip">💡 Tipp: Hut 2 blinkt!</div>
+        <div id="stats">Wins: 0 | Losses: 0 | Multi: x1.8</div>
+        
+        <div id="gameOver">
+            <div style="font-size: 48px; margin-bottom: 20px;">Verloren! 💀</div>
+            <div id="finalBalance" style="font-size: 28px; margin-bottom: 30px;"></div>
+            <button onclick="location.reload()" style="padding: 15px 40px; font-size: 24px; background: linear-gradient(45deg, #44ff88, #22cc66); border: none; border-radius: 25px; cursor: pointer; box-shadow: 0 10px 30px rgba(68,255,136,0.6);">Nochmal spielen! 🎰</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        class HuechenspielDeluxe {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.FogExp2(0x1a0a2e, 0.03);
+                
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                this.renderer.toneMappingExposure = 1.5;
+                
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.enableZoom = false;
+                this.controls.enablePan = false;
+                this.camera.position.set(0, 8, 12);
+                this.controls.target.set(0, 0, 0);
+                this.controls.update();
+                
+                // Game state
+                this.money = 500;
+                this.bet = 10;
+                this.wins = 0;
+                this.losses = 0;
+                this.multiplier = 1.8;
+                this.gameState = 'idle'; // idle, mixing, betting, result
+                this.correctHut = 0;
+                this.nussVisible = false;
+                
+                this.initLighting();
+                this.createTable();
+                this.createHuts();
+                this.setupBetting();
+                this.setupUI();
+                this.animate();
+            }
+            
+            initLighting() {
+                const ambient = new THREE.AmbientLight(0x4a2a66, 0.4);
+                this.scene.add(ambient);
+                
+                const spotLight1 = new THREE.SpotLight(0x8833ff, 2, 30, Math.PI/6, 0.5);
+                spotLight1.position.set(-5, 10, 5);
+                spotLight1.castShadow = true;
+                spotLight1.shadow.mapSize.width = 2048;
+                spotLight1.shadow.mapSize.height = 2048;
+                this.scene.add(spotLight1);
+                
+                const spotLight2 = new THREE.SpotLight(0xaa55ff, 1.5, 30, Math.PI/6, 0.5);
+                spotLight2.position.set(5, 10, 5);
+                spotLight2.castShadow = true;
+                this.scene.add(spotLight2);
+                
+                // Velvet table glow
+                const tableGlow = new THREE.PointLight(0x442288, 0.8, 20);
+                tableGlow.position.set(0, 2, 0);
+                this.scene.add(tableGlow);
+            }
+            
+            createTable() {
+                const geometry = new THREE.BoxGeometry(12, 1, 8);
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: 0x2a1a4a,
+                    shininess: 100,
+                    specular: 0x222244
+                });
+                const table = new THREE.Mesh(geometry, material);
+                table.position.y = 0.5;
+                table.receiveShadow = true;
+                table.castShadow = true;
+                this.scene.add(table);
+                
+                // Velvet texture effect
+                const edgeGeometry = new THREE.BoxGeometry(12.2, 0.3, 8.2);
+                const edgeMaterial = new THREE.MeshPhongMaterial({ color: 0x663399 });
+                const edge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+                edge.position.y = 0.2;
+                this.scene.add(edge);
+            }
+            
+            createHuts() {
+                this.huts = [];
+                this.hutPositions = [
+                    new THREE.Vector3(-3, 1, 2),
+                    new THREE.Vector3(0, 1, 2),
+                    new THREE.Vector3(3, 1, 2)
+                ];
+                
+                for (let i = 0; i < 3; i++) {
+                    const group = new THREE.Group();
+                    
+                    // Hut base
+                    const baseGeometry = new THREE.CylinderGeometry(1.2, 1.5, 1.5, 12);
+                    const baseMaterial = new THREE.MeshPhongMaterial({ 
+                        color: 0x1a0a2e,
+                        shininess: 50,
+                        metalness: 0.3
+                    });
+                    const base = new THREE.Mesh(baseGeometry, baseMaterial);
+                    base.castShadow = true;
+                    base.receiveShadow = true;
+                    group.add(base);
+                    
+                    // Hut top
+                    const topGeometry = new THREE.ConeGeometry(1.3, 2, 12);
+                    const topMaterial = new THREE.MeshPhongMaterial({ 
+                        color: 0x331144,
+                        shininess: 100,
+                        metalness: 0.6
+                    });
+                    const top = new THREE.Mesh(topGeometry, topMaterial);
+                    top.position.y = 1.75;
+                    top.castShadow = true;
+                    group.add(top);
+                    
+                    // Rim glow
+                    const rimGeometry = new THREE.TorusGeometry(1.4, 0.05, 8, 32);
+                    const rimMaterial = new THREE.MeshBasicMaterial({ color: 0x8833ff, transparent: true, opacity: 0.8 });
+                    const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+                    rim.rotation.x = Math.PI / 2;
+                    rim.position.y = 0.75;
+                    group.add(rim);
+                    
+                    group.position.copy(this.hutPositions[i]);
+                    group.userData = { index: i, hasNuss: false };
+                    this.huts.push(group);
+                    this.scene.add(group);
+                }
+            }
+            
+            setupBetting() {
+                document.getElementById('betMinus').addEventListener('click', () => {
+                    if (this.bet > 5) this.bet -= 5;
+                    this.updateBetDisplay();
+                });
+                
+                document.getElementById('betPlus').addEventListener('click', () => {
+                    if (this.bet * 2 <= this.money) this.bet += 5;
+                    this.updateBetDisplay();
+                });
+            }
+            
+            setupUI() {
+                this.updateUI();
+                document.querySelectorAll('.hut-btn').forEach((btn, i) => {
+                    btn.addEventListener('click', () => this.guessHut(i));
+                    btn.id = `hut${i+1}`;
+                });
+                
+                document.getElementById('spinBtn').addEventListener('click', () => this.startGame());
+            }
+            
+            updateBetDisplay() {
+                document.getElementById('betAmount').textContent = this.bet;
+            }
+            
+            updateUI() {
+                document.getElementById('balance').textContent = this.money;
+            }
+            
+            startGame() {
+                if (this.money < this.bet) return;
+                
+                // Random correct hut
+                this.correctHut = Math.floor(Math.random() * 3);
+                this.gameState = 'mixing';
+                this.nussVisible = false;
+                
+                document.getElementById('spinStatus').style.display = 'block';
+                document.getElementById('spinStatus').textContent = 'Mische Hütchen... 🎲';
+                
+                // Mix animation
+                let mixCount = 0;
+                const mixInterval = setInterval(() => {
+                    this.huts.forEach(hut => {
+                        hut.rotation.y += Math.random() * 0.3 - 0.15;
+                    });
+                    mixCount++;
+                    if (mixCount > 50) {
+                        clearInterval(mixInterval);
+                        this.gameState = 'betting';
+                        document.getElementById('spinStatus').style.display = 'none';
+                        document.querySelectorAll('.hut-btn').forEach(btn => btn.disabled = false);
+                    }
+                }, 50);
+                
+                // Random tip 30% chance
+                setTimeout(() => {
+                    if (Math.random() < 0.3) {
+                        const tipHut = this.correctHut;
+                        document.getElementById('tip').textContent = `💡 Tipp: Hut ${tipHut+1} blinkt!`;
+                        document.getElementById('tip').style.display = 'block';
+                        
+                        // Blink effect
+                        const blinkInterval = setInterval(() => {
+                            const hut = this.huts[tipHut];
+                            hut.material.emissive.setHex(hut.material.emissive.getHex() === 0x000000 ? 0x44ff88 : 0x000000);
+                        }, 300);
+                        setTimeout(() => clearInterval(blinkInterval), 3000);
+                        setTimeout(() => document.getElementById('tip').style.display = 'none', 5000);
+                    }
+                }, 1000);
+            }
+            
+            guessHut(guessIndex) {
+                if (this.gameState !== 'betting') return;
+                
+                this.gameState = 'result';
+                document.querySelectorAll('.hut-btn').forEach(btn => btn.disabled = true);
+                
+                const won = guessIndex === this.correctHut;
+                const hut = this.huts[this.correctHut];
+                
+                if (won) {
+                    this.money += Math.floor(this.bet * this.multiplier);
+                    this.wins++;
+                    document.getElementById('spinStatus').textContent = '🎉 GEWONNEN! +$' + Math.floor(this.bet * this.multiplier);
+                    hut.material.emissive.setHex(0x44ff88);
+                } else {
+                    this.money -= this.bet;
+                    this.losses++;
+                    document.getElementById('spinStatus').textContent = '💀 VERLOREN! -$' + this.bet;
+                    hut.material.emissive.setHex(0xff4444);
+                }
+                
+                document.getElementById('spinStatus').style.display = 'block';
+                document.getElementById('stats').textContent = `Wins: ${this.wins} | Losses: ${this.losses} | Multi: x${this.multiplier.toFixed(1)}`;
+                
+                this.updateUI();
+                this.nussVisible = true;
+                
+                if (this.money <= 0) {
+                    document.getElementById('finalBalance').textContent = `Final: 0 Münzen`;
+                    document.getElementById('gameOver').style.display = 'block';
+                } else {
+                    setTimeout(() => {
+                        document.getElementById('spinStatus').style.display = 'none';
+                        this.gameState = 'idle';
+                        document.querySelectorAll('.hut-btn').forEach(btn => btn.disabled = false);
+                        this.resetHuts();
+                    }, 3000);
+                }
+            }
+            
+            resetHuts() {
+                this.huts.forEach((hut, i) => {
+                    hut.rotation.y = 0;
+                    hut.material.emissive.setHex(0x000000);
+                    hut.userData.hasNuss = i === this.correctHut;
+                });
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                // Table rotation subtle
+                if (this.gameState === 'mixing') {
+                    this.scene.rotation.y += 0.01;
+                } else {
+                    this.scene.rotation.y *= 0.95;
+                }
+                
+                // Hut bobble
+                this.huts.forEach((hut, i) => {
+                    hut.rotation.z = Math.sin(Date.now() * 0.005 + i) * 0.1;
+                    hut.position.y = 1 + Math.sin(Date.now() * 0.003 + i * 2) * 0.05;
+                });
+                
+                // Light pulse
+                const time = Date.now() * 0.001;
+                const spot1 = this.scene.children.find(c => c.type === 'SpotLight' && c.position.x < 0);
+                if (spot1) spot1.intensity = 2 + Math.sin(time) * 0.5;
+                
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+        
+        // Global instance
+        window.gameInstance = new HuechenspielDeluxe();
+        
+        // Resize
+        window.addEventListener('resize', () => {
+            const game = window.gameInstance;
+            if (game) {
+                game.camera.aspect = window.innerWidth / window.innerHeight;
+                game.camera.updateProjectionMatrix();
+                game.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+    </script>
+</body>
+</html>

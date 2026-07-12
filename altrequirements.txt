@@ -1,0 +1,52 @@
+﻿# === Kern (Telegram + Webserver + AI) ===
+gunicorn>=22.0
+uvicorn[standard]>=0.27
+python-telegram-bot[job-queue,webhooks]>=22.0,<23.0
+fastapi>=0.110.0
+groq==0.11.0
+gtts>=2.5.3                      # Google Text-to-Speech (einfache Variante)
+audioop-lts>=0.2.1
+uvicorn>=0.25.0
+openai>=1.0.0
+pydub==0.25.1
+aiofiles>=24.1.0
+orjson>=3.10.0                   # schnelleres JSON (wird von vielen Libs intern genutzt)
+ffmpeg-python>=0.2.0             # falls pydub ffmpeg braucht (oft separat installiert)
+matplotlib>=3.8.0
+# === YouTube Transcript (neu hinzufÃ¼gen) ===
+youtube-transcript-api>=0.6.2
+
+
+# === AI / Multimodal ===
+huggingface_hub>=0.28.0
+requests==2.32.3
+httpx==0.27.2
+
+# === Dokumenten- & Datei-Verarbeitung ===
+PyPDF2>=3.0.0
+reportlab>=4.0.0
+python-docx>=1.0.0
+pandas>=2.0.0
+openpyxl>=3.0.0
+google-api-python-client>=2.160.0
+google-auth-oauthlib>=1.2.1
+google-auth-httplib2>=0.2.0
+
+# === Sonstiges / Nice-to-have ===
+python-dotenv>=1.0.0
+
+pillow>=10.4.0
+
+moviepy>=1.0.3                  # nur wenn du Video-Dauer / Metadaten willst (braucht ffmpeg auf Render!)
+imageio>=2.34.0
+imageio-ffmpeg>=0.5.1
+pymupdf>=1.24.0                 # deutlich bessere PDF-Extraktion + zukÃ¼nftiges OCR-Potenzial
+
+
+# Nur wenn du spÃ¤ter Bilder / erweiterte Features willst:
+# pillow>=10.4.0                 # Bildverarbeitung
+supabase>=2.0.0
+yt-dlp==2026.3.17
+jinja2>=3.1.0
+
+

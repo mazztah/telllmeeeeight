@@ -1,0 +1,98 @@
+/* Space War - Galactic Shooter v2.0 - Android Optimized */
+:root{--neon:#0ff;--neon2:#f0f;--neon3:#ff0;--bg:#050510;--ship:#4ecdc4;--enemy:#ff4444;--boss:#ff00ff;--coin:#ffd700;--hp:#ff3333}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;touch-action:none;user-select:none;-webkit-user-select:none}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Segoe UI',system-ui,-apple-system,sans-serif;color:#fff}
+#gameCanvas{display:block;width:100%;height:100%;background:radial-gradient(ellipse at center,#0a0a2e 0%,#000 100%);touch-action:none;-webkit-touch-callout:none}
+
+/* UI */
+#ui{position:fixed;top:0;left:0;width:100%;padding:8px 10px;display:flex;justify-content:space-between;align-items:center;z-index:100;pointer-events:none;gap:4px}
+.ui-box{background:rgba(0,0,0,.7);border:1px solid var(--neon);border-radius:6px;padding:5px 8px;font-size:clamp(9px,2.2vw,13px);font-weight:700;text-shadow:0 0 8px var(--neon);color:#fff;white-space:nowrap;line-height:1.2;text-align:center}
+.ui-box span{color:var(--neon);font-size:clamp(11px,2.8vw,16px);display:block}
+#hpBar{flex:1;max-width:120px;height:14px;background:rgba(255,0,0,.2);border:1px solid var(--hp);border-radius:7px;overflow:hidden;min-width:60px}
+#hpFill{height:100%;width:100%;background:linear-gradient(90deg,#ff3333,#ff6666);transition:width .3s;box-shadow:0 0 8px #ff3333}
+
+/* Weapon Indicator */
+#weaponIndicator{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:5px;z-index:100;pointer-events:none}
+.weapon-icon{width:clamp(26px,7vw,38px);height:clamp(26px,7vw,38px);border:2px solid var(--neon);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:clamp(11px,3.5vw,18px);background:rgba(0,0,0,.6);opacity:.3;transition:all .3s}
+.weapon-icon.active{opacity:1;box-shadow:0 0 12px var(--neon);transform:scale(1.08)}
+
+/* Boss */
+#bossBar{position:fixed;top:45px;left:50%;transform:translateX(-50%);width:75%;max-width:380px;height:18px;background:rgba(255,0,255,.2);border:2px solid var(--boss);border-radius:9px;overflow:hidden;display:none;z-index:100}
+#bossFill{height:100%;width:100%;background:linear-gradient(90deg,#ff00ff,#ff66ff);transition:width .3s;box-shadow:0 0 12px #ff00ff}
+#bossName{position:fixed;top:66px;left:50%;transform:translateX(-50%);color:var(--boss);font-size:clamp(13px,3.8vw,17px);font-weight:900;text-shadow:0 0 12px #ff00ff;display:none;z-index:100;white-space:nowrap}
+
+/* Touch Controls */
+#touchControls{position:fixed;bottom:0;left:0;width:100%;height:50%;z-index:150;pointer-events:none;display:none}
+#moveZone{position:absolute;bottom:15px;left:15px;width:130px;height:130px;border:3px solid rgba(0,255,255,.2);border-radius:50%;pointer-events:auto;touch-action:none;background:rgba(0,255,255,.03);display:flex;align-items:center;justify-content:center}
+#moveKnob{position:absolute;width:46px;height:46px;background:rgba(0,255,255,.45);border-radius:50%;box-shadow:0 0 15px #0ff;pointer-events:none;transition:transform .05s}
+#fireBtn{position:absolute;bottom:25px;right:20px;width:75px;height:75px;border-radius:50%;background:rgba(255,0,0,.35);border:3px solid rgba(255,100,100,.5);display:flex;align-items:center;justify-content:center;pointer-events:auto;touch-action:none;box-shadow:0 0 18px rgba(255,0,0,.25);transition:transform .1s;z-index:160}
+#fireBtn::after{content:"💥";font-size:28px;filter:drop-shadow(0 0 5px #f00)}
+#fireBtn:active{transform:scale(.92);background:rgba(255,0,0,.6)}
+
+/* Sound Toggle */
+#soundToggle{position:fixed;top:12px;left:12px;z-index:200;background:rgba(0,0,0,.7);border:1px solid var(--neon);border-radius:8px;padding:5px 8px;font-size:clamp(16px,5vw,22px);cursor:pointer;color:#fff;pointer-events:auto;transition:transform .1s}
+#soundToggle:active{transform:scale(.9)}
+
+/* Overlays */
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.88);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:1000;backdrop-filter:blur(8px);padding:15px;overflow-y:auto}
+.overlay.hidden{display:none!important}
+.overlay h1{font-size:clamp(28px,9vw,46px);color:var(--neon);text-shadow:0 0 25px #0ff;margin-bottom:8px;text-align:center;animation:pulse 2.5s infinite}
+.overlay h2{font-size:clamp(22px,7vw,30px);color:var(--neon2);text-shadow:0 0 18px #f0f;margin:6px 0;text-align:center}
+.btn{padding:clamp(10px,3vw,14px) clamp(22px,7vw,38px);margin:5px;font-size:clamp(13px,3.8vw,17px);font-weight:700;border:none;border-radius:10px;cursor:pointer;transition:all .15s;text-transform:uppercase;letter-spacing:1px;min-width:170px;text-align:center;touch-action:manipulation}
+.btn-start{background:linear-gradient(135deg,var(--neon),#0088ff);color:#000;box-shadow:0 0 18px #0ff}
+.btn-start:active{transform:scale(.96);box-shadow:0 0 28px #0ff}
+.btn-shop{background:linear-gradient(135deg,var(--neon3),#ff8800);color:#000;box-shadow:0 0 18px #ff0}
+.btn-shop:active{transform:scale(.96)}
+.stats{display:flex;gap:clamp(6px,2.5vw,16px);margin:12px 0;flex-wrap:wrap;justify-content:center}
+.stat{text-align:center;padding:clamp(8px,2.5vw,14px);background:rgba(0,255,255,.08);border:1px solid var(--neon);border-radius:10px;min-width:clamp(65px,18vw,95px)}
+.stat-value{font-size:clamp(18px,5.5vw,26px);color:var(--neon);font-weight:800}
+.stat-label{font-size:clamp(9px,2.2vw,11px);color:#aaa;text-transform:uppercase}
+
+/* Shop */
+#shopPanel{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,16,.97);z-index:2000;display:none;flex-direction:column;padding:15px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#shopPanel h2{color:var(--neon3);text-shadow:0 0 18px #ff0;text-align:center;margin-bottom:12px;font-size:clamp(22px,7vw,30px)}
+.shop-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:500px;margin:0 auto;width:100%}
+.shop-item{background:rgba(0,255,255,.04);border:2px solid rgba(0,255,255,.25);border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer;transition:all .15s;touch-action:manipulation}
+.shop-item:active{border-color:var(--neon);background:rgba(0,255,255,.12);transform:scale(.97)}
+.shop-item.owned{border-color:var(--neon3);opacity:.55}
+.shop-item .icon{font-size:clamp(22px,6.5vw,34px);margin-bottom:5px}
+.shop-item .name{font-size:clamp(11px,3.2vw,15px);font-weight:700;color:var(--neon);margin-bottom:3px}
+.shop-item .desc{font-size:clamp(9px,2.5vw,11px);color:#aaa;margin-bottom:6px}
+.shop-item .price{color:var(--coin);font-weight:800;font-size:clamp(13px,3.8vw,17px)}
+.shop-coins{position:fixed;top:12px;right:12px;font-size:clamp(16px,4.5vw,22px);color:var(--coin);font-weight:800;z-index:2001;background:rgba(0,0,0,.7);padding:4px 10px;border-radius:8px;border:1px solid var(--coin)}
+
+/* Name Input */
+#nameInput{padding:10px 18px;font-size:15px;border:2px solid var(--neon);border-radius:8px;background:rgba(0,0,0,.7);color:#fff;text-align:center;margin-bottom:10px;width:min(85%,240px);outline:none;-webkit-appearance:none}
+#nameInput:focus{box-shadow:0 0 12px var(--neon)}
+
+/* Loading */
+#loadingScreen{position:fixed;top:0;left:0;width:100%;height:100%;background:#050510;z-index:9999;display:flex;flex-direction:column;justify-content:center;align-items:center;transition:opacity .4s}
+#loadingScreen.hidden{opacity:0;pointer-events:none}
+.spinner{width:45px;height:45px;border:4px solid rgba(0,255,255,.15);border-top-color:var(--neon);border-radius:50%;animation:spin .9s linear infinite}
+
+/* Animations */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes shake{0%,100%{transform:translate(0)}25%{transform:translate(-4px,4px)}50%{transform:translate(4px,-4px)}75%{transform:translate(-4px,-4px)}}
+.shake{animation:shake .4s}
+@keyframes levelUpAnim{0%{opacity:0;transform:translate(-50%,-50%) scale(.5)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.4) translateY(-40px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Mobile specific */
+@media(max-width:768px){
+  #touchControls{display:flex!important}
+  #ui{padding:6px 8px}
+  .btn{min-width:160px}
+  .shop-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:380px){
+  #moveZone{width:110px;height:110px}
+  #moveKnob{width:40px;height:40px}
+  #fireBtn{width:65px;height:65px}
+  #fireBtn::after{font-size:24px}
+  .shop-grid{gap:8px}
+  .shop-item{padding:10px 6px}
+}
+
+/* Hide scrollbar in shop */
+#shopPanel::-webkit-scrollbar{width:4px}
+#shopPanel::-webkit-scrollbar-thumb{background:rgba(0,255,255,.3);border-radius:2px}

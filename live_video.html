@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Live Video AI Chat</title>
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+<style>
+body {margin:0;padding:20px;background:#1a1a1a;color:#fff;font-family:Arial;}
+#videos {display:flex;gap:10px;}
+video {width:45%;height:400px;background:#333;border-radius:10px;}
+#sidebar {position:fixed;right:20px;top:20px;width:300px;background:rgba(0,0,0,0.8);padding:20px;border-radius:10px;}
+#transcript {height:400px;overflow:auto;background:#000;padding:10px;border-radius:5px;font-size:14px;}
+#btns button {margin:5px;background:#4a90e2;color:white;border:none;padding:10px;border-radius:5px;cursor:pointer;}
+#avatar {width:45%;height:400px;background:#222;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:48px;color:#aaa;}
+</style>
+</head>
+<body>
+<div id="videos">
+<video id="userVideo" autoplay playsinline muted></video>
+<div id="avatar">🤖 Bot</div>
+</div>
+<div id="sidebar">
+<h3>Transcript</h3>
+<div id="transcript"></div>
+<button onclick="downloadTranscript()">📥 Download</button>
+</div>
+
+<script>
+let socket;
+let stream;
+let transcript = [];
+let mediaRecorder;
+
+navigator.mediaDevices.getUserMedia({video:true, audio:true}).then(s => {
+  stream = s;
+  document.getElementById('userVideo').srcObject = stream;
+  // Dynamic WS URL from query param ?ws=ws://localhost:8001
+  const urlParams = new URLSearchParams(window.location.search);
+  const wsUrl = urlParams.get('ws') || 'ws://localhost:8001';
+  socket = io(wsUrl);
+
+  // Frame capture + send every 1s
+  setInterval(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 320; canvas.height = 240;
+    canvas.getContext('2d').drawImage(document.getElementById('userVideo'),0,0,320,240);
+    const frame = canvas.toDataURL('image/jpeg', 0.8);
+    
+    const audioCtx = new AudioContext();
+    // Simple audio chunk (full impl Whisper STT backend)
+    
+    socket.emit('user_frame', {frame, timestamp: Date.now()});
+  }, 1000);
+
+  socket.on('bot_video', data => {
+    // Update avatar/video with bot response video base64 or TTS anim
+    document.getElementById('avatar').innerHTML = data.video || '🤖 Speaking...';
+  });
+
+  socket.on('transcript_update', data => {
+    transcript.push(data.text);
+    document.getElementById('transcript').innerHTML = transcript.slice(-20).join('\\n');
+  });
+}).catch(e => console.error('Media error', e));
+
+function downloadTranscript() {
+  const blob = new Blob([transcript.join('\\n')], {type:'text/plain'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'chat_transcript.txt';
+  a.click();
+}
+</script>
+</body>
+</html>
+

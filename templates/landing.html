@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>JobQueen – KI-Jobsuche für den DACH-Raum</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #0f0f1a;
+      --s1:      #1a1a2e;
+      --s2:      #252540;
+      --border:  #2a2f3f;
+      --border2: #3a3f55;
+      --text:    #e8ecf4;
+      --text2:   #b8bdd4;
+      --muted:   #7a8099;
+      --accent:  #a78bfa;
+      --green:   #34d399;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { overflow-x:hidden; scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
+    body {
+      font-family:'Inter', system-ui, sans-serif;
+      background:var(--bg); color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      overflow-x:hidden;
+    }
+    ::-webkit-scrollbar { width:5px; }
+    ::-webkit-scrollbar-track { background:var(--bg); }
+    ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+
+    /* ── NAV ────────────────────────────────── */
+    nav {
+      position:fixed; top:0; left:0; right:0; z-index:200;
+      height:52px; padding:0 20px;
+      display:flex; align-items:center; justify-content:space-between;
+      background:rgba(15,15,26,0.9);
+      backdrop-filter:blur(20px);
+      border-bottom:1px solid rgba(167,139,250,0.08);
+    }
+    .logo {
+      font-size:0.95rem; font-weight:800; color:var(--accent);
+      display:flex; align-items:center; gap:7px; text-decoration:none;
+    }
+    .nav-links { display:flex; align-items:center; gap:4px; }
+    .nav-link {
+      font-size:0.8rem; color:var(--text2); text-decoration:none;
+      padding:6px 10px; border-radius:6px; transition:color .2s;
+      /* hidden on very small phones */
+    }
+    .nav-link:hover { color:var(--accent); }
+    .nav-cta {
+      padding:8px 16px; background:var(--accent); color:#0f0f1a;
+      border:none; border-radius:8px; font-size:0.8rem; font-weight:700;
+      cursor:pointer; text-decoration:none; white-space:nowrap;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .nav-cta:hover { background:#c4b5fd; }
+
+    /* Hide nav links on very small screens */
+    @media(max-width:400px) {
+      .nav-link { display:none; }
+      nav { padding:0 14px; }
+    }
+
+    /* ── HERO ───────────────────────────────── */
+    .hero {
+      min-height:100svh;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      text-align:center;
+      padding:80px 20px 60px;
+      position:relative; overflow:hidden;
+    }
+    .hero-glow {
+      position:absolute; top:10%; left:50%; transform:translateX(-50%);
+      width:min(700px,120vw); height:500px;
+      background:radial-gradient(ellipse, rgba(124,58,237,0.12) 0%, transparent 70%);
+      pointer-events:none;
+    }
+
+    .badge {
+      display:inline-flex; align-items:center; gap:6px;
+      padding:5px 14px; margin-bottom:24px;
+      background:rgba(167,139,250,0.08);
+      border:1px solid rgba(167,139,250,0.25);
+      border-radius:100px;
+      font-size:0.72rem; font-weight:600;
+      color:var(--accent); letter-spacing:0.04em;
+    }
+    .dot-live {
+      width:6px; height:6px; border-radius:50%;
+      background:var(--green); box-shadow:0 0 6px var(--green);
+      animation:pulse 2s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    .hero-title {
+      font-size:clamp(2.4rem, 8vw, 5.5rem);
+      font-weight:800; letter-spacing:-0.04em;
+      line-height:1.0; margin-bottom:18px;
+    }
+    .line1 { display:block; color:var(--text); }
+    .line2 {
+      display:block;
+      background:linear-gradient(135deg, var(--accent), #c4b5fd);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text;
+    }
+
+    .hero-sub {
+      font-size:clamp(0.9rem, 2.5vw, 1.05rem);
+      color:var(--text2); max-width:500px;
+      line-height:1.7; margin-bottom:36px;
+    }
+
+    /* Animated search box */
+    .search-demo {
+      width:100%; max-width:520px; margin:0 auto 36px;
+    }
+    .search-box {
+      display:flex; align-items:center; gap:10px;
+      background:var(--s1); border:1px solid var(--border2);
+      border-radius:12px; padding:12px 16px;
+      box-shadow:0 0 40px rgba(124,58,237,0.12);
+    }
+    #typed-text {
+      flex:1; font-size:clamp(0.8rem, 2.5vw, 0.9rem); color:var(--text2);
+      text-align:left; min-height:1.3em; min-width:0;
+    }
+    .cursor {
+      display:inline-block; width:2px; height:1em;
+      background:var(--accent); margin-left:1px;
+      animation:blink .9s step-end infinite; vertical-align:text-bottom;
+    }
+    @keyframes blink { 50%{opacity:0} }
+    .search-demo-btn {
+      padding:8px 14px; background:var(--accent); color:#0f0f1a;
+      border:none; border-radius:8px; font-size:0.78rem; font-weight:700;
+      cursor:pointer; flex-shrink:0; white-space:nowrap;
+    }
+    .search-hint {
+      margin-top:7px; font-size:0.7rem; color:var(--muted); text-align:left;
+      padding:0 4px;
+    }
+
+    .hero-actions {
+      display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
+    }
+    .btn-primary {
+      padding:13px 26px; background:var(--accent); color:#0f0f1a;
+      border:none; border-radius:10px;
+      font-size:clamp(0.85rem, 2vw, 0.92rem); font-weight:700;
+      cursor:pointer; text-decoration:none; transition:all .2s;
+      box-shadow:0 0 28px rgba(124,58,237,0.25);
+      -webkit-tap-highlight-color:transparent;
+    }
+    .btn-primary:hover { transform:translateY(-2px); background:#c4b5fd; }
+    .btn-ghost {
+      padding:13px 26px; background:transparent; color:var(--text2);
+      border:1px solid var(--border); border-radius:10px;
+      font-size:clamp(0.85rem, 2vw, 0.92rem); cursor:pointer;
+      text-decoration:none; transition:all .2s;
+    }
+    .btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+
+    .stats {
+      display:flex; gap:clamp(20px, 5vw, 48px); margin-top:52px;
+      flex-wrap:wrap; justify-content:center;
+    }
+    .stat { text-align:center; }
+    .stat-n { font-size:1.7rem; font-weight:800; color:var(--accent); }
+    .stat-l { font-size:0.72rem; color:var(--muted); margin-top:2px; }
+
+    /* ── SECTIONS ───────────────────────────── */
+    .section {
+      max-width:1060px; margin:0 auto;
+      padding:clamp(60px, 8vw, 96px) clamp(16px, 5vw, 24px);
+    }
+    .eyebrow {
+      font-size:0.7rem; font-weight:700; color:var(--accent);
+      letter-spacing:0.12em; text-transform:uppercase; margin-bottom:12px;
+    }
+    .section-h {
+      font-size:clamp(1.5rem, 4vw, 2rem);
+      font-weight:800; letter-spacing:-0.025em; margin-bottom:40px;
+    }
+
+    /* Features grid */
+    .features {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(min(100%,280px),1fr));
+      gap:14px;
+    }
+    .feat {
+      background:var(--s1); border:1px solid var(--border);
+      border-radius:14px; padding:22px; transition:all .25s;
+    }
+    .feat:hover {
+      border-color:rgba(167,139,250,0.35);
+      transform:translateY(-3px);
+    }
+    .feat-icon {
+      width:38px; height:38px; background:rgba(167,139,250,0.1);
+      border-radius:9px; display:flex; align-items:center;
+      justify-content:center; font-size:1.1rem; margin-bottom:15px;
+    }
+    .feat h3 { font-size:0.88rem; font-weight:700; margin-bottom:7px; }
+    .feat p  { font-size:0.78rem; color:var(--text2); line-height:1.6; }
+
+    /* Platforms */
+    .platforms-box {
+      background:var(--s1); border:1px solid var(--border);
+      border-radius:18px; padding:clamp(24px, 5vw, 44px);
+      text-align:center;
+    }
+    .platforms-box h3 { font-size:1.2rem; font-weight:800; margin-bottom:6px; }
+    .platforms-box p  { font-size:0.82rem; color:var(--muted); margin-bottom:24px; }
+    .chips { display:flex; flex-wrap:wrap; gap:7px; justify-content:center; }
+    .chip {
+      padding:5px 12px; background:var(--s2); border:1px solid var(--border);
+      border-radius:100px; font-size:0.75rem; color:var(--text2);
+    }
+    .chip.hi {
+      background:rgba(167,139,250,0.08);
+      border-color:rgba(167,139,250,0.35); color:var(--accent);
+    }
+
+    /* Steps */
+    .steps {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(min(100%,200px),1fr));
+      gap:16px;
+    }
+    .step {
+      display:flex; gap:14px; align-items:flex-start;
+      background:var(--s1); border:1px solid var(--border);
+      border-radius:12px; padding:18px;
+    }
+    .step-n {
+      width:28px; height:28px; border-radius:50%; flex-shrink:0;
+      background:rgba(167,139,250,0.12); border:1px solid var(--accent);
+      color:var(--accent); font-size:0.75rem; font-weight:800;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .step-t { font-size:0.85rem; font-weight:700; margin-bottom:4px; }
+    .step-d { font-size:0.77rem; color:var(--text2); line-height:1.55; }
+
+    /* CTA */
+    .cta-wrap {
+      text-align:center;
+      padding:clamp(60px,8vw,100px) clamp(16px,5vw,24px);
+      position:relative;
+    }
+    .cta-glow {
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:min(600px,90vw); height:280px;
+      background:radial-gradient(ellipse, rgba(124,58,237,0.08) 0%, transparent 70%);
+      pointer-events:none;
+    }
+    .cta-wrap h2 {
+      font-size:clamp(1.5rem, 5vw, 2.2rem);
+      font-weight:800; letter-spacing:-0.03em; margin-bottom:12px;
+    }
+    .cta-wrap p { font-size:0.92rem; color:var(--text2); margin-bottom:32px; }
+
+    footer {
+      border-top:1px solid var(--border); padding:20px clamp(16px,5vw,32px);
+      display:flex; align-items:center; justify-content:space-between;
+      flex-wrap:wrap; gap:8px;
+    }
+    footer span { font-size:0.75rem; color:var(--muted); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/landing" class="logo">👑 JobQueen</a>
+  <div class="nav-links">
+    <a href="#features" class="nav-link">Features</a>
+    <a href="#platforms" class="nav-link">Portale</a>
+    <a href="/starter" class="nav-cta">Workspace →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow"></div>
+
+  <div class="badge"><span class="dot-live"></span> 20+ Jobbörsen · KI-Analyse · DACH</div>
+
+  <h1 class="hero-title">
+    <span class="line1">Alle Jobs.</span>
+    <span class="line2">Ein Workspace.</span>
+  </h1>
+
+  <p class="hero-sub">
+    JobQueen durchsucht Indeed, StepStone, LinkedIn und 17 weitere Portale gleichzeitig,
+    analysiert deinen Lebenslauf und schreibt dein Anschreiben – per KI.
+  </p>
+
+  <div class="search-demo">
+    <div class="search-box">
+      <span style="color:var(--muted);flex-shrink:0">🔍</span>
+      <span id="typed-text"><span class="cursor"></span></span>
+      <button class="search-demo-btn" onclick="location.href='/starter'">Suchen</button>
+    </div>
+    <p class="search-hint">Natürliche Sprache · alle Portale auf einmal</p>
+  </div>
+
+  <div class="hero-actions">
+    <a href="/starter" class="btn-primary">Jetzt kostenlos starten →</a>
+    <a href="#how" class="btn-ghost">Wie es funktioniert</a>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-n">20+</div><div class="stat-l">Jobbörsen</div></div>
+    <div class="stat"><div class="stat-n">KI</div><div class="stat-l">CV-Analyse</div></div>
+    <div class="stat"><div class="stat-n">Excel</div><div class="stat-l">Export</div></div>
+    <div class="stat"><div class="stat-n">0 €</div><div class="stat-l">Einstieg</div></div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="eyebrow">Funktionen</div>
+  <h2 class="section-h">Alles in einem Workspace</h2>
+  <div class="features">
+    <div class="feat">
+      <div class="feat-icon">🔍</div>
+      <h3>Aggregator-Suche</h3>
+      <p>Ein Suchfeld für Indeed, StepStone, LinkedIn, XING und 15+ weitere – gleichzeitig, gefiltert, sortiert.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🤖</div>
+      <h3>KI-Assistent „Queen"</h3>
+      <p>„Finde 50 Immobilienkaufmann-Stellen in Hannover als Excel" – versteht natürliche Sprache.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📄</div>
+      <h3>CV-Analyse & Matching</h3>
+      <p>Lebenslauf hochladen → automatische Skill-Extraktion und Matching-Score zu passenden Stellen.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📋</div>
+      <h3>Bewerbungs-Tracker</h3>
+      <p>Kanban-Board für alle laufenden Bewerbungen mit Fristen, Notizen und Erinnerungen.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📤</div>
+      <h3>Excel & PDF Export</h3>
+      <p>Alle Suchergebnisse sauber als Excel-Datei exportieren. Oder Bewerbungsmappe als PDF.</p>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🎯</div>
+      <h3>Interview-Coach</h3>
+      <p>Typische Fragen für deine Zielstelle und personalisierte Antworthinweise per KI.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PLATFORMS -->
+<section class="section" id="platforms" style="padding-top:0">
+  <div class="platforms-box">
+    <div class="eyebrow">Portale</div>
+    <h3>Alle großen Jobbörsen auf einmal</h3>
+    <p>Generalisten, Nischenportale &amp; Karrierenetzwerke – eine Suche, alle Ergebnisse</p>
+    <div class="chips">
+      <span class="chip hi">Indeed</span>
+      <span class="chip hi">StepStone</span>
+      <span class="chip hi">LinkedIn</span>
+      <span class="chip hi">XING</span>
+      <span class="chip">Arbeitsagentur</span>
+      <span class="chip">Monster</span>
+      <span class="chip">Kimeta</span>
+      <span class="chip">Jobware</span>
+      <span class="chip">MeineStadt.de</span>
+      <span class="chip">Gigajob</span>
+      <span class="chip">Absolventa</span>
+      <span class="chip">Jobvector</span>
+      <span class="chip">Yourfirm</span>
+      <span class="chip">Staufenbiel</span>
+      <span class="chip">Green Jobs</span>
+      <span class="chip">Hotelcareer</span>
+      <span class="chip">Berlin Startup Jobs</span>
+      <span class="chip">T5 Karriere</span>
+      <span class="chip">JobLeads</span>
+      <span class="chip">+ mehr</span>
+    </div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section class="section" id="how" style="padding-top:0">
+  <div class="eyebrow">So funktioniert's</div>
+  <h2 class="section-h">In 3 Schritten zur Bewerbung</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-n">1</div>
+      <div>
+        <div class="step-t">Profil anlegen</div>
+        <div class="step-d">Lebenslauf hochladen. KI extrahiert Skills und schlägt Berufsbezeichnungen vor.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n">2</div>
+      <div>
+        <div class="step-t">Suche starten</div>
+        <div class="step-d">Stelle und Ort eingeben – oder natürlich formulieren. Alle Portale gleichzeitig.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-n">3</div>
+      <div>
+        <div class="step-t">Bewerben &amp; tracken</div>
+        <div class="step-d">Anschreiben per KI, Status tracken, Excel exportieren – ohne Extra-Tools.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-wrap">
+  <div class="cta-glow"></div>
+  <h2>Bereit für deinen nächsten Job?</h2>
+  <p>Kein Setup, kein Abo. Direkt loslegen.</p>
+  <a href="/starter" class="btn-primary" style="display:inline-block;">Workspace öffnen →</a>
+</div>
+
+<footer>
+  <span>👑 JobQueen · KI-Karriereplattform DACH</span>
+  <span>Queen's Stack</span>
+</footer>
+
+<script>
+  const queries = [
+    'Immobilienkaufmann Hannover hybrid 45k',
+    'UX Designer Berlin remote senior',
+    'Pflegefachkraft München Vollzeit',
+    'Softwareentwickler Python 3 Jahre',
+    'Vertrieb Stuttgart Außendienst',
+    'Data Analyst Frankfurt 60k+',
+  ];
+  const el = document.getElementById('typed-text');
+  let qi=0, ci=0, del=false;
+
+  function tick() {
+    const q = queries[qi];
+    if (!del) {
+      ci++;
+      el.innerHTML = q.slice(0,ci) + '<span class="cursor"></span>';
+      if (ci===q.length) { del=true; setTimeout(tick,1800); return; }
+    } else {
+      ci--;
+      el.innerHTML = q.slice(0,ci) + '<span class="cursor"></span>';
+      if (ci===0) { del=false; qi=(qi+1)%queries.length; setTimeout(tick,280); return; }
+    }
+    setTimeout(tick, del ? 30 : 55);
+  }
+  setTimeout(tick, 700);
+</script>
+</body>
+</html>

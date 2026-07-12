@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚡ Super-Skill.md Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a1a; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0a1a; }
+    ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect, useCallback } = React;
+
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// SYSTEM PROMPTS
+// ═══════════════════════════════════════════════════════════════════════
+
+const TODAY = new Date().toISOString().split("T")[0];
+
+const GENERATE_SYSTEM = `Du bist der "Perfect PowerSkill Creator" v2.0 — ein Meta-Skill-Architekt für professionelle PowerSkill.md Dateien auf Enterprise-Niveau.
+
+DEINE AUFGABE: Erstelle eine VOLLSTÄNDIGE PowerSkill.md Datei mit exakt 17 Pflichtabschnitten. Gib NUR die Markdown-Datei aus — kein erklärender Text davor oder danach.
+
+═══ PFLICHTSTRUKTUR (alle 17 Abschnitte MÜSSEN vorhanden sein) ═══
+
+1. YAML-FRONTMATTER
+---
+title: PowerSkill – [Skill-Name]
+version: 1.0
+last_updated: ${TODAY}
+author: PowerSkill Architect
+role: [Kurze Rollenbezeichnung]
+purpose: >
+  [Zweckbeschreibung in 2-3 Sätzen]
+tags:
+  - [tag1]
+  - [tag2]
+  - [tag3]
+compatibility:
+  - Claude 4 (Opus / Sonnet / Haiku)
+  - Grok 3
+  - GPT-5 / o3
+  - Cursor / Windsurf / Continue
+  - Obsidian · Notion · Git
+---
+
+2. H1-TITEL + BLOCKQUOTE ONE-LINER
+# 🚀 PowerSkill: [Name]
+> **One-Liner**
+> [Präzise Kern-Definition, max. 2 Sätze]
+
+3. INHALTSVERZEICHNIS (nummeriert, alle 15 Abschnitte)
+
+4. ZIEL & ZWECK
+- Problem-Statement + Value Proposition
+- Tabelle mit Eigenschaften (Eigenschaft | Beschreibung | Warum wichtig)
+- Code-Block: Ohne vs. Mit PowerSkill Vergleich
+
+5. ANWENDUNGSBEREICHE & ABGRENZUNG
+- ✅ Primäre Einsatzgebiete (mind. 4 Punkte)
+- 🔄 Sekundäre Einsatzgebiete
+- ❌ Nicht geeignet für
+
+6. AKTIVIERUNG & PROMPT-PROTOKOLL
+- Standard-Aktivierung (Code-Block, kopierfertig)
+- Erweiterter Aktivierungsmodus
+- Scope-Definition: 5 Klärungsfragen
+
+7. SKILL-ANATOMIE & PFLICHTSTRUKTUR
+- Dateibaum (Code-Block)
+- Liste aller 17 Pflichtabschnitte
+
+8. KOMPETENZMATRIX
+Tabelle: Bereich | Level | Stand 2026 | Kernstärken
+(mind. 5 Bereiche, Level: Expert/Advanced/Intermediate)
+
+9. STATE-OF-THE-ART BESTANDTEILE 2026
+Gegliedert nach Kategorien mit konkreten Tools/Frameworks/Versionen
+
+10. WORKFLOWS
+Mind. 2 Mermaid-Diagramme:
+- Haupt-Workflow (flowchart TD)
+- Optimierungs-Workflow (flowchart LR)
+Plus phasierte Beschreibung jeder Phase
+
+11. CORE PRINCIPLES (5-8 Prinzipien)
+Jedes Prinzip: ### P1 — Titel + konkrete Handlungsanweisung
+
+12. OUTPUT-FORMAT-REGELN
+- Tonality-Tabelle
+- Visuelle Elemente (Tabelle: Element | Wann einsetzen)
+- Längenvorgaben
+
+13. KONKRETE BEISPIELE
+Mind. 1 vollständiges Input/Output-Paar mit Beispiel-Klärungsfragen und Beispiel-Kompetenzmatrix
+
+14. ANTI-PATTERNS & HÄUFIGE FEHLER
+Tabelle: Anti-Pattern | Problem | Lösung (mind. 8 Zeilen)
+
+15. QUALITÄTS-CHECKLISTE
+Checkboxen nach Kategorien (Vollständigkeit / Aktivierung / Inhalt / Format / Standards)
+Gewichtungs-Tabelle: Kategorie | Gewicht | Mindestpunktzahl
+
+16. KOMBINIERBARKEIT & SKILL-ÖKOSYSTEM
+- Baumstruktur verwandter Skills (Code-Block)
+- Integration in Claude Projects Beispiel
+
+17. VERSIONSHISTORIE & ROADMAP
+- Changelog-Tabelle (Version | Datum | Änderungen)
+- Roadmap-Tabelle (Milestone | Geplant | Feature)
+- Abschlusszeile
+
+═══ QUALITÄTSREGELN ═══
+- Mindestlänge: 400 Zeilen
+- Sprache: Deutsch (Fachbegriffe auf Englisch)
+- Alle Mermaid-Diagramme syntaktisch korrekt
+- Alle Tabellen vollständig und ausgerichtet
+- Professionell, Enterprise-Niveau, sofort produktionsreif`;
+
+const CHAT_SYSTEM = `Du bist der Super-Skill Assistant — Experte für PowerSkill.md Erstellung, Prompt Engineering und KI-Skill-Design.
+
+AUFGABEN:
+• Skill-Scopes definieren und schärfen
+• 17-Pflichtabschnitte-Struktur erklären und reviewen
+• Generierte Skills analysieren und konkrete Verbesserungen vorschlagen
+• Fragen zu Prompt Engineering, Mermaid, Enterprise-KI beantworten
+• Beim Optimierungs-Workflow führen
+
+WENN EIN SKILL VORHANDEN IST (als Kontext übergeben):
+- Beziehe dich direkt auf dessen Inhalt
+- Identifiziere fehlende Abschnitte oder Schwächen
+- Mache konkrete, umsetzbare Verbesserungsvorschläge
+- Schlage Additions für Anti-Patterns, Beispiele oder Workflows vor
+
+STIL: Deutsch, strukturiert, präzise, Markdown-Formatierung. Keine Füllsätze.`;
+
+// ═══════════════════════════════════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════════════════════════════════
+
+async function callClaude(messages, system, maxTokens = 8000) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: maxTokens,
+      system,
+      messages,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API Error ${res.status}`);
+  }
+  const data = await res.json();
+  return data.content.find((b) => b.type === "text")?.text || "";
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MARKDOWN RENDERER
+// ═══════════════════════════════════════════════════════════════════════
+
+function InlineText({ text }) {
+  const parts = [];
+  let remaining = String(text || "");
+  let key = 0;
+  while (remaining.length > 0) {
+    const boldIdx = remaining.indexOf("**");
+    const codeIdx = remaining.indexOf("`");
+    const italicIdx = remaining.indexOf("*");
+    const candidates = [
+      boldIdx >= 0 ? boldIdx : Infinity,
+      codeIdx >= 0 ? codeIdx : Infinity,
+    ];
+    const minIdx = Math.min(...candidates);
+    if (minIdx === Infinity) {
+      parts.push(<span key={key++}>{remaining}</span>);
+      break;
+    }
+    if (minIdx > 0) {
+      parts.push(<span key={key++}>{remaining.slice(0, minIdx)}</span>);
+      remaining = remaining.slice(minIdx);
+    }
+    if (remaining.startsWith("**")) {
+      const end = remaining.indexOf("**", 2);
+      if (end < 0) { parts.push(<span key={key++}>{remaining}</span>); break; }
+      parts.push(<strong key={key++} style={{ color: "#e2e8f0", fontWeight: 700 }}>{remaining.slice(2, end)}</strong>);
+      remaining = remaining.slice(end + 2);
+    } else if (remaining.startsWith("`")) {
+      const end = remaining.indexOf("`", 1);
+      if (end < 0) { parts.push(<span key={key++}>{remaining}</span>); break; }
+      parts.push(<code key={key++} style={{ background: "#1e1e3e", padding: "1px 5px", borderRadius: 3, fontSize: "0.85em", color: "#67e8f9", fontFamily: "monospace" }}>{remaining.slice(1, end)}</code>);
+      remaining = remaining.slice(end + 1);
+    } else {
+      parts.push(<span key={key++}>{remaining[0]}</span>);
+      remaining = remaining.slice(1);
+    }
+  }
+  return <>{parts}</>;
+}
+
+function MdTable({ rows }) {
+  const nonSep = rows.filter((r) => !r.match(/^\|[\s\-:|]+\|$/));
+  return (
+    <div style={{ overflowX: "auto", marginBottom: 12 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <tbody>
+          {nonSep.map((row, ri) => {
+            const cells = row.split("|").slice(1, -1).map((c) => c.trim());
+            return (
+              <tr key={ri} style={{ background: ri === 0 ? "#1e1e42" : ri % 2 === 0 ? "#13132a" : "transparent" }}>
+                {cells.map((cell, ci) => {
+                  const Tag = ri === 0 ? "th" : "td";
+                  return (
+                    <Tag key={ci} style={{ border: "1px solid #2a2a5a", padding: "5px 10px", textAlign: "left", color: ri === 0 ? "#818cf8" : "#94a3b8", fontWeight: ri === 0 ? 700 : 400 }}>
+                      <InlineText text={cell} />
+                    </Tag>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SimpleMarkdown({ content }) {
+  if (!content) return null;
+  const lines = content.split("\n");
+  const result = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // YAML frontmatter
+    if (i === 0 && line.trim() === "---") {
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() !== "---") j++;
+      result.push(
+        <div key={`yaml-${i}`} style={{ background: "#0e0e24", border: "1px solid #4f46e5", borderRadius: 8, padding: 12, marginBottom: 16, overflow: "auto" }}>
+          <div style={{ fontSize: 10, color: "#6366f1", fontWeight: 700, marginBottom: 6, letterSpacing: 2 }}>YAML FRONTMATTER</div>
+          <pre style={{ margin: 0, fontSize: 12, color: "#a5b4fc", fontFamily: "monospace", whiteSpace: "pre-wrap" }}>{lines.slice(i + 1, j).join("\n")}</pre>
+        </div>
+      );
+      i = j + 1; continue;
+    }
+
+    // Code block
+    if (line.startsWith("```")) {
+      const lang = line.slice(3).trim();
+      const codeLines = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith("```")) { codeLines.push(lines[i]); i++; }
+      const isMermaid = lang === "mermaid";
+      result.push(
+        <div key={`code-${i}`} style={{ marginBottom: 12 }}>
+          <div style={{ background: "#4f46e5", color: "white", fontSize: 10, padding: "2px 8px", borderRadius: "4px 4px 0 0", display: "inline-block", fontWeight: 700 }}>{lang || "code"}</div>
+          <pre style={{ background: isMermaid ? "#0a0a1a" : "#0e0e24", border: `1px solid ${isMermaid ? "#6366f1" : "#2a2a5a"}`, borderRadius: "0 4px 4px 4px", padding: 12, margin: 0, fontSize: 12, color: isMermaid ? "#a5b4fc" : "#94a3b8", overflowX: "auto", whiteSpace: "pre-wrap", fontFamily: "monospace" }}>
+            {codeLines.join("\n")}
+          </pre>
+        </div>
+      );
+      i++; continue;
+    }
+
+    // Table
+    if (line.startsWith("|")) {
+      const tableLines = [];
+      while (i < lines.length && lines[i].startsWith("|")) { tableLines.push(lines[i]); i++; }
+      result.push(<MdTable key={`tbl-${i}`} rows={tableLines} />);
+      continue;
+    }
+
+    // Headers
+    if (line.startsWith("# ")) { result.push(<h1 key={i} style={{ fontSize: 20, fontWeight: 800, color: "#e0e7ff", borderBottom: "2px solid #4f46e5", paddingBottom: 6, marginBottom: 10, marginTop: 20 }}><InlineText text={line.slice(2)} /></h1>); i++; continue; }
+    if (line.startsWith("## ")) { result.push(<h2 key={i} style={{ fontSize: 16, fontWeight: 700, color: "#818cf8", marginBottom: 8, marginTop: 18, display: "flex", alignItems: "center", gap: 6 }}><InlineText text={line.slice(3)} /></h2>); i++; continue; }
+    if (line.startsWith("### ")) { result.push(<h3 key={i} style={{ fontSize: 13, fontWeight: 700, color: "#c084fc", marginBottom: 6, marginTop: 12 }}><InlineText text={line.slice(4)} /></h3>); i++; continue; }
+    if (line.startsWith("#### ")) { result.push(<h4 key={i} style={{ fontSize: 12, fontWeight: 700, color: "#67e8f9", marginBottom: 4, marginTop: 8 }}><InlineText text={line.slice(5)} /></h4>); i++; continue; }
+
+    // Blockquote
+    if (line.startsWith("> ")) { result.push(<blockquote key={i} style={{ borderLeft: "3px solid #4f46e5", paddingLeft: 12, margin: "6px 0", color: "#94a3b8", fontStyle: "italic", fontSize: 13 }}><InlineText text={line.slice(2)} /></blockquote>); i++; continue; }
+
+    // HR
+    if (line.trim() === "---" || line.trim() === "***") { result.push(<hr key={i} style={{ border: "none", borderTop: "1px solid #2a2a5a", margin: "12px 0" }} />); i++; continue; }
+
+    // Checkbox unchecked
+    if (line.match(/^- \[ \] /)) { result.push(<div key={i} style={{ display: "flex", gap: 8, marginBottom: 2, fontSize: 12, color: "#94a3b8" }}><span style={{ color: "#64748b", flexShrink: 0 }}>☐</span><InlineText text={line.slice(6)} /></div>); i++; continue; }
+    // Checkbox checked
+    if (line.match(/^- \[x\] /i)) { result.push(<div key={i} style={{ display: "flex", gap: 8, marginBottom: 2, fontSize: 12, color: "#94a3b8" }}><span style={{ color: "#34d399", flexShrink: 0 }}>☑</span><InlineText text={line.slice(6)} /></div>); i++; continue; }
+
+    // List item (- or * or number)
+    if (line.match(/^[-*•] /) || line.match(/^\d+\. /)) {
+      const isNum = line.match(/^\d+\. /);
+      const text = isNum ? line.replace(/^\d+\. /, "") : line.slice(2);
+      const depth = line.match(/^(\s+)/)?.[1]?.length || 0;
+      result.push(<div key={i} style={{ display: "flex", gap: 6, marginBottom: 2, fontSize: 12, paddingLeft: depth * 12 + 4 }}><span style={{ color: "#6366f1", flexShrink: 0, marginTop: 1 }}>•</span><span style={{ color: "#94a3b8" }}><InlineText text={text} /></span></div>);
+      i++; continue;
+    }
+
+    // Empty line
+    if (line.trim() === "") { result.push(<div key={i} style={{ height: 5 }} />); i++; continue; }
+
+    // Regular text
+    result.push(<p key={i} style={{ fontSize: 12, color: "#94a3b8", marginBottom: 3, lineHeight: 1.6 }}><InlineText text={line} /></p>);
+    i++;
+  }
+  return <>{result}</>;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CHAT MESSAGE RENDERER
+// ═══════════════════════════════════════════════════════════════════════
+
+function ChatText({ text }) {
+  const lines = text.split("\n");
+  return (
+    <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.7 }}>
+      {lines.map((line, i) => {
+        if (line.startsWith("### ")) return <div key={i} style={{ fontWeight: 700, color: "#c084fc", marginTop: 8 }}>{line.slice(4)}</div>;
+        if (line.startsWith("## ")) return <div key={i} style={{ fontWeight: 700, color: "#818cf8", marginTop: 8 }}>{line.slice(3)}</div>;
+        if (line.startsWith("# ")) return <div key={i} style={{ fontWeight: 800, color: "#e0e7ff", marginTop: 8 }}>{line.slice(2)}</div>;
+        if (line.startsWith("**") && line.endsWith("**")) return <div key={i} style={{ fontWeight: 700, color: "#e2e8f0" }}>{line.slice(2, -2)}</div>;
+        if (line.match(/^[-*•] /)) return <div key={i} style={{ display: "flex", gap: 6, marginBottom: 1 }}><span style={{ color: "#6366f1" }}>•</span><InlineText text={line.slice(2)} /></div>;
+        if (line.trim() === "") return <div key={i} style={{ height: 4 }} />;
+        if (line.startsWith("> ")) return <div key={i} style={{ borderLeft: "2px solid #4f46e5", paddingLeft: 8, color: "#64748b", fontStyle: "italic" }}><InlineText text={line.slice(2)} /></div>;
+        return <div key={i}><InlineText text={line} /></div>;
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════════════
+
+function Toast({ toasts, remove }) {
+  return (
+    <div style={{ position: "fixed", top: 80, right: 20, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8 }}>
+      {toasts.map((t) => (
+        <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: t.type === "error" ? "rgba(248,113,113,0.15)" : t.type === "success" ? "rgba(52,211,153,0.15)" : "rgba(99,102,241,0.15)", border: `1px solid ${t.type === "error" ? "#f87171" : t.type === "success" ? "#34d399" : "#6366f1"}`, borderRadius: 8, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", maxWidth: 360, animation: "slideIn .3s ease" }}>
+          <span style={{ fontSize: 16 }}>{t.type === "error" ? "❌" : t.type === "success" ? "✅" : "ℹ️"}</span>
+          <span style={{ fontSize: 13, color: "#e2e8f0", flex: 1 }}>{t.message}</span>
+          <button onClick={() => remove(t.id)} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 16, padding: 0 }}>×</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════════════════
+
+const DEPTHS = ["Überblick", "Detailliert", "Exhaustive"];
+
+export default function SuperSkillApp() {
+  // Config
+  const [scope, setScope] = useState("");
+  const [audience, setAudience] = useState("Senior Engineer");
+  const [depth, setDepth] = useState(1);
+  const [model, setModel] = useState("Claude 4");
+  const [workflows, setWorkflows] = useState(["Erstellung", "Optimierung"]);
+
+  // Generation
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentSkill, setCurrentSkill] = useState(null); // { title, content, id, created }
+  const [skillLibrary, setSkillLibrary] = useState([]);
+  const [activeTab, setActiveTab] = useState("preview");
+
+  // Chat
+  const [chatHistory, setChatHistory] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatting, setIsChatting] = useState(false);
+  const chatEndRef = useRef(null);
+
+  // Progress
+  const [progress, setProgress] = useState({ step: 0, label: "" });
+
+  // Toasts
+  const [toasts, setToasts] = useState([]);
+  const toastCounter = useRef(0);
+
+  const addToast = useCallback((message, type = "info") => {
+    const id = ++toastCounter.current;
+    setToasts((p) => [...p, { id, message, type }]);
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 5000);
+  }, []);
+  const removeToast = useCallback((id) => setToasts((p) => p.filter((t) => t.id !== id)), []);
+
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatHistory, isChatting]);
+
+  // ── Generate Skill ─────────────────────────────────────────────────
+
+  const generateSkill = async () => {
+    if (scope.trim().length < 10) { addToast("Skill-Scope muss mindestens 10 Zeichen haben.", "error"); return; }
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setProgress({ step: 1, label: "Scope-Analyse..." });
+
+    const steps = [
+      { step: 1, label: "Scope-Analyse & Requirements...", delay: 0 },
+      { step: 2, label: "Struktur & Architektur designen...", delay: 1500 },
+      { step: 3, label: "Inhalte generieren (17 Abschnitte)...", delay: 3500 },
+      { step: 4, label: "Qualitätsprüfung & Finalisierung...", delay: 7000 },
+    ];
+    const timers = steps.map(({ step, label, delay }) =>
+      setTimeout(() => setProgress({ step, label }), delay)
+    );
+
+    try {
+      const wfList = workflows.length > 0 ? workflows.join(", ") : "Erstellung, Optimierung";
+      const prompt = `Erstelle eine vollständige PowerSkill.md Datei mit allen 17 Pflichtabschnitten.
+
+SCOPE-DEFINITION:
+1. Was: ${scope}
+2. Zielgruppe: ${audience}
+3. Tiefe: ${DEPTHS[depth]}
+4. Primäres KI-System: ${model}
+5. Workflows: ${wfList}
+
+Erstelle die Datei jetzt vollständig und produktionsreif.`;
+
+      const content = await callClaude([{ role: "user", content: prompt }], GENERATE_SYSTEM, 8000);
+
+      // Extract title from YAML or H1
+      let title = scope.slice(0, 50);
+      const yamlTitle = content.match(/^title:\s*(.+)$/m)?.[1]?.trim().replace(/^"|"$/g, "").replace(/^PowerSkill\s*[–-]\s*/i, "");
+      const h1Title = content.match(/^#\s+[🚀⚡✨]*\s*PowerSkill:\s*(.+)$/m)?.[1]?.trim();
+      if (yamlTitle) title = yamlTitle;
+      else if (h1Title) title = h1Title;
+
+      const skill = {
+        id: `skill_${Date.now()}`,
+        title,
+        content,
+        created: new Date().toLocaleString("de-DE"),
+        size: content.length,
+        lines: content.split("\n").length,
+      };
+
+      timers.forEach(clearTimeout);
+      setProgress({ step: 4, label: "Fertig!" });
+      setCurrentSkill(skill);
+      setSkillLibrary((p) => [skill, ...p]);
+      setActiveTab("preview");
+      addToast(`✅ "${title}" erfolgreich generiert! (${skill.lines} Zeilen)`, "success");
+    } catch (err) {
+      timers.forEach(clearTimeout);
+      console.error(err);
+      addToast(`Generierung fehlgeschlagen: ${err.message}`, "error");
+    } finally {
+      setIsGenerating(false);
+      setTimeout(() => setProgress({ step: 0, label: "" }), 2000);
+    }
+  };
+
+  // ── Download ───────────────────────────────────────────────────────
+
+  const downloadSkill = (skill = currentSkill) => {
+    if (!skill) { addToast("Kein Skill vorhanden.", "error"); return; }
+    const blob = new Blob([skill.content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `PowerSkill-${skill.title.replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, "-")}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast("Download gestartet!", "success");
+  };
+
+  const copySkill = () => {
+    if (!currentSkill) return;
+    navigator.clipboard.writeText(currentSkill.content).then(() => addToast("Skill kopiert!", "success")).catch(() => addToast("Kopieren fehlgeschlagen.", "error"));
+  };
+
+  // ── Workflow Tags ──────────────────────────────────────────────────
+
+  const toggleWorkflow = (wf) => {
+    setWorkflows((p) => p.includes(wf) ? p.filter((w) => w !== wf) : [...p, wf]);
+  };
+
+  // ── Chat ───────────────────────────────────────────────────────────
+
+  const sendChat = async () => {
+    const msg = chatInput.trim();
+    if (!msg || isChatting) return;
+    setChatInput("");
+    setIsChatting(true);
+
+    const userMsg = { role: "user", content: msg };
+    const newHistory = [...chatHistory, userMsg];
+    setChatHistory(newHistory);
+
+    try {
+      // Include current skill as context if available
+      const contextNote = currentSkill
+        ? `\n\nAKTUELLER SKILL (für Referenz/Optimierung):\nTitle: ${currentSkill.title}\nZeilen: ${currentSkill.lines}\n\nINHALT (Auszug erste 2000 Zeichen):\n${currentSkill.content.slice(0, 2000)}...`
+        : "";
+
+      const systemWithContext = CHAT_SYSTEM + contextNote;
+      const apiMessages = newHistory.map((m) => ({ role: m.role, content: m.content }));
+
+      const reply = await callClaude(apiMessages, systemWithContext, 2000);
+      setChatHistory((p) => [...p, { role: "assistant", content: reply }]);
+    } catch (err) {
+      setChatHistory((p) => [...p, { role: "assistant", content: `❌ Fehler: ${err.message}` }]);
+    } finally {
+      setIsChatting(false);
+    }
+  };
+
+  const handleChatKey = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  };
+
+  // ── Refine with Chat ───────────────────────────────────────────────
+
+  const refineWithBot = async (instruction) => {
+    if (!currentSkill) { addToast("Bitte zuerst einen Skill generieren.", "error"); return; }
+    if (isChatting) return;
+    setIsChatting(true);
+    const msg = `Bitte verbessere diesen Skill:\n\n${instruction}\n\nGib den KOMPLETTEN überarbeiteten Skill als Markdown aus.`;
+    const userMsg = { role: "user", content: msg };
+    const newHistory = [...chatHistory, userMsg];
+    setChatHistory(newHistory);
+
+    try {
+      const contextSystem = GENERATE_SYSTEM + `\n\nAKTUELLER SKILL:\n${currentSkill.content}`;
+      const reply = await callClaude(newHistory.map((m) => ({ role: m.role, content: m.content })), contextSystem, 8000);
+
+      // Check if reply is a full skill (starts with ---)
+      if (reply.trim().startsWith("---") || reply.trim().startsWith("# ")) {
+        const updated = { ...currentSkill, content: reply, lines: reply.split("\n").length, id: `skill_${Date.now()}` };
+        setCurrentSkill(updated);
+        setSkillLibrary((p) => [updated, ...p.filter((s) => s.id !== currentSkill.id)]);
+        setChatHistory((p) => [...p, { role: "assistant", content: "✅ Skill wurde aktualisiert und wird jetzt in der Vorschau angezeigt." }]);
+        addToast("Skill erfolgreich optimiert!", "success");
+      } else {
+        setChatHistory((p) => [...p, { role: "assistant", content: reply }]);
+      }
+    } catch (err) {
+      setChatHistory((p) => [...p, { role: "assistant", content: `❌ Fehler: ${err.message}` }]);
+    } finally {
+      setIsChatting(false);
+    }
+  };
+
+  // ── Styles ─────────────────────────────────────────────────────────
+
+  const S = {
+    app: { background: "#0a0a1a", minHeight: "100vh", fontFamily: "'Segoe UI', system-ui, sans-serif", color: "#f1f5f9", display: "flex", flexDirection: "column" },
+    header: { background: "rgba(10,10,26,0.9)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(99,102,241,0.2)", padding: "12px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 100 },
+    logo: { display: "flex", alignItems: "center", gap: 10 },
+    logoTitle: { fontSize: 18, fontWeight: 800, background: "linear-gradient(135deg,#818cf8,#c084fc)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" },
+    logoSub: { fontSize: 11, color: "#64748b", letterSpacing: 2, textTransform: "uppercase" },
+    badge: { background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 20, padding: "4px 12px", fontSize: 12, color: "#818cf8", fontWeight: 600 },
+    workspace: { display: "grid", gridTemplateColumns: "340px 1fr 340px", gap: 12, padding: 12, flex: 1, minHeight: 0 },
+    panel: { background: "#13132a", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 12, display: "flex", flexDirection: "column", overflow: "hidden" },
+    panelHdr: { padding: "12px 16px", background: "rgba(99,102,241,0.05)", borderBottom: "1px solid rgba(99,102,241,0.1)", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 },
+    panelTitle: { fontSize: 13, fontWeight: 700, flex: 1 },
+    panelBody: { flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 14 },
+    label: { fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 },
+    input: { background: "#0e0e24", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, padding: "8px 12px", color: "#f1f5f9", fontSize: 13, fontFamily: "inherit", outline: "none", width: "100%", boxSizing: "border-box" },
+    textarea: { background: "#0e0e24", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, padding: "8px 12px", color: "#f1f5f9", fontSize: 13, fontFamily: "monospace", outline: "none", width: "100%", boxSizing: "border-box", resize: "vertical", minHeight: 80 },
+    select: { background: "#0e0e24", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, padding: "8px 12px", color: "#f1f5f9", fontSize: 13, width: "100%", outline: "none" },
+    tag: (active) => ({ padding: "4px 12px", borderRadius: 20, border: `1px solid ${active ? "#6366f1" : "rgba(99,102,241,0.2)"}`, background: active ? "rgba(99,102,241,0.2)" : "transparent", color: active ? "#818cf8" : "#64748b", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }),
+    genBtn: (dis) => ({ background: dis ? "rgba(99,102,241,0.3)" : "linear-gradient(135deg,#6366f1,#a855f7)", border: "none", borderRadius: 10, padding: "12px 20px", color: "white", fontSize: 14, fontWeight: 700, cursor: dis ? "not-allowed" : "pointer", width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.2s", opacity: dis ? 0.6 : 1 }),
+    tabBar: { display: "flex", gap: 4, padding: "8px 12px", borderBottom: "1px solid rgba(99,102,241,0.1)", flexShrink: 0 },
+    tab: (active) => ({ padding: "4px 12px", borderRadius: 6, border: `1px solid ${active ? "#6366f1" : "transparent"}`, background: active ? "rgba(99,102,241,0.15)" : "transparent", color: active ? "#818cf8" : "#64748b", fontSize: 12, fontWeight: 600, cursor: "pointer" }),
+    toolbar: { display: "flex", gap: 6, padding: "8px 12px", borderBottom: "1px solid rgba(99,102,241,0.1)", flexShrink: 0 },
+    tbBtn: { padding: "4px 12px", borderRadius: 6, border: "1px solid rgba(99,102,241,0.2)", background: "rgba(99,102,241,0.08)", color: "#818cf8", fontSize: 12, fontWeight: 600, cursor: "pointer" },
+    previewContent: { flex: 1, overflowY: "auto", padding: 16 },
+    rawContent: { flex: 1, overflow: "hidden" },
+    rawTA: { width: "100%", height: "100%", background: "#0e0e24", border: "none", padding: 16, color: "#94a3b8", fontSize: 12, fontFamily: "monospace", resize: "none", outline: "none", boxSizing: "border-box" },
+    emptyState: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 32, textAlign: "center" },
+    chatMessages: { flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 12 },
+    chatInputArea: { borderTop: "1px solid rgba(99,102,241,0.1)", padding: 12, background: "#0e0e24", flexShrink: 0 },
+    chatTA: { width: "100%", background: "#13132a", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 8, padding: "8px 12px", color: "#f1f5f9", fontSize: 13, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box" },
+    sendBtn: (dis) => ({ marginTop: 6, background: dis ? "rgba(99,102,241,0.2)" : "linear-gradient(135deg,#6366f1,#a855f7)", border: "none", borderRadius: 8, padding: "7px 16px", color: "white", fontSize: 13, fontWeight: 700, cursor: dis ? "not-allowed" : "pointer", width: "100%", opacity: dis ? 0.6 : 1 }),
+    msgBubble: (role) => ({ display: "flex", gap: 8, alignItems: "flex-start", flexDirection: role === "user" ? "row-reverse" : "row" }),
+    msgAvatar: (role) => ({ width: 28, height: 28, borderRadius: "50%", background: role === "user" ? "linear-gradient(135deg,#22d3ee,#6366f1)" : "linear-gradient(135deg,#6366f1,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }),
+    msgContent: (role) => ({ background: role === "user" ? "rgba(34,211,238,0.08)" : "rgba(99,102,241,0.08)", border: `1px solid ${role === "user" ? "rgba(34,211,238,0.2)" : "rgba(99,102,241,0.15)"}`, borderRadius: 10, padding: "8px 12px", maxWidth: "85%" }),
+    progressBar: { background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 10, padding: 16, margin: "0 16px 8px" },
+  };
+
+  const STEPS_LABELS = ["Scope-Analyse", "Struktur-Design", "Inhalts-Generierung", "Qualitätsprüfung"];
+
+  // ── Render ─────────────────────────────────────────────────────────
+
+  return (
+    <div style={S.app}>
+      <style>{`
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0a1a; }
+        ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+        @keyframes slideIn { from { opacity:0; transform: translateX(20px); } to { opacity:1; transform: translateX(0); } }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        input:focus, textarea:focus, select:focus { border-color: rgba(99,102,241,0.5) !important; box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
+      `}</style>
+
+      <Toast toasts={toasts} remove={removeToast} />
+
+      {/* HEADER */}
+      <header style={S.header}>
+        <div style={S.logo}>
+          <span style={{ fontSize: 22 }}>⚡</span>
+          <div>
+            <div style={S.logoTitle}>Super-Skill.md Generator</div>
+            <div style={S.logoSub}>Enterprise PowerSkill Creator v2.0</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={S.badge}>🧠 Claude Sonnet</span>
+          <span style={{ ...S.badge, background: "rgba(52,211,153,0.1)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399" }}>● API Connected</span>
+        </div>
+      </header>
+
+      {/* PROGRESS BAR */}
+      {isGenerating && (
+        <div style={S.progressBar}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            {STEPS_LABELS.map((label, idx) => (
+              <div key={idx} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, flex: 1 }}>
+                <div style={{ width: 24, height: 24, borderRadius: "50%", background: progress.step > idx ? "#6366f1" : progress.step === idx + 1 ? "rgba(99,102,241,0.5)" : "#1e1e3e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: progress.step > idx ? "white" : "#64748b", transition: "all 0.5s" }}>
+                  {progress.step > idx + 1 ? "✓" : idx + 1}
+                </div>
+                <span style={{ fontSize: 10, color: progress.step === idx + 1 ? "#818cf8" : "#64748b", textAlign: "center" }}>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: "#1e1e3e", borderRadius: 4, height: 3, overflow: "hidden" }}>
+            <div style={{ background: "linear-gradient(90deg,#6366f1,#a855f7)", height: "100%", width: `${(progress.step / 4) * 100}%`, transition: "width 0.8s ease", borderRadius: 4 }} />
+          </div>
+          <div style={{ textAlign: "center", fontSize: 11, color: "#818cf8", marginTop: 6, animation: "pulse 1.5s infinite" }}>{progress.label}</div>
+        </div>
+      )}
+
+      {/* WORKSPACE */}
+      <div style={S.workspace}>
+
+        {/* LEFT: CONFIG PANEL */}
+        <div style={S.panel}>
+          <div style={S.panelHdr}>
+            <span>⚙️</span>
+            <span style={S.panelTitle}>Skill-Konfiguration</span>
+          </div>
+          <div style={S.panelBody}>
+            {/* Scope */}
+            <div>
+              <div style={S.label}>🎯 Skill-Scope <span style={{ color: "#f87171" }}>*</span></div>
+              <textarea
+                style={S.textarea}
+                value={scope}
+                onChange={(e) => setScope(e.target.value)}
+                placeholder={"Beschreibe, was der Skill können soll...\n\nz.B. Professionelles Technical Writing für API-Dokumentation und ADRs auf Enterprise-Niveau"}
+                rows={4}
+              />
+              <div style={{ fontSize: 10, color: "#64748b", marginTop: 3 }}>Min. 10 Zeichen · Ctrl+Enter zum Generieren</div>
+            </div>
+
+            {/* Audience */}
+            <div>
+              <div style={S.label}>👥 Zielgruppe</div>
+              <select style={S.select} value={audience} onChange={(e) => setAudience(e.target.value)}>
+                <option>Junior Developer</option>
+                <option>Senior Engineer</option>
+                <option>Tech Lead</option>
+                <option>Enterprise / C-Level</option>
+                <option>AI-Agent</option>
+              </select>
+            </div>
+
+            {/* Depth */}
+            <div>
+              <div style={{ ...S.label, marginBottom: 8 }}>📊 Tiefe: <span style={{ color: "#818cf8" }}>{DEPTHS[depth]}</span></div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {DEPTHS.map((d, i) => (
+                  <button key={d} onClick={() => setDepth(i)} style={{ ...S.tag(depth === i), flex: 1, border: `1px solid ${depth === i ? "#6366f1" : "rgba(99,102,241,0.2)"}` }}>{d}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Model */}
+            <div>
+              <div style={S.label}>🤖 Primäres KI-System</div>
+              <select style={S.select} value={model} onChange={(e) => setModel(e.target.value)}>
+                <option>Claude 4</option>
+                <option>GPT-5</option>
+                <option>Grok 3</option>
+                <option>LLaMA-4</option>
+                <option>Universal / Alle</option>
+              </select>
+            </div>
+
+            {/* Workflows */}
+            <div>
+              <div style={S.label}>🔄 Kernszenarien</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {["Erstellung", "Optimierung", "Review", "Validierung", "Refactoring", "Maintenance"].map((wf) => (
+                  <button key={wf} onClick={() => toggleWorkflow(wf)} style={S.tag(workflows.includes(wf))}>
+                    {workflows.includes(wf) && "✓ "}{wf}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Generate Button */}
+            <button
+              style={S.genBtn(isGenerating || scope.trim().length < 10)}
+              onClick={generateSkill}
+              disabled={isGenerating || scope.trim().length < 10}
+            >
+              {isGenerating ? (
+                <><span style={{ display: "inline-block", width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} /> Generiere...</>
+              ) : (
+                <><span>⚡</span> PowerSkill Generieren</>
+              )}
+            </button>
+
+            {/* Library */}
+            {skillLibrary.length > 0 && (
+              <div>
+                <div style={S.label}>📚 Generierte Skills ({skillLibrary.length})</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {skillLibrary.slice(0, 5).map((sk) => (
+                    <div key={sk.id} style={{ background: "#0e0e24", border: `1px solid ${sk.id === currentSkill?.id ? "#6366f1" : "rgba(99,102,241,0.1)"}`, borderRadius: 8, padding: "8px 10px", cursor: "pointer" }} onClick={() => setCurrentSkill(sk)}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sk.title}</div>
+                      <div style={{ fontSize: 10, color: "#64748b", display: "flex", justifyContent: "space-between" }}>
+                        <span>{sk.lines} Zeilen</span>
+                        <button onClick={(e) => { e.stopPropagation(); downloadSkill(sk); }} style={{ background: "none", border: "none", color: "#6366f1", cursor: "pointer", fontSize: 10, padding: 0 }}>⬇ Download</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* CENTER: PREVIEW PANEL */}
+        <div style={S.panel}>
+          <div style={S.panelHdr}>
+            <span>👁️</span>
+            <span style={S.panelTitle}>Vorschau & Editor</span>
+            {currentSkill && (
+              <span style={{ fontSize: 10, color: "#64748b" }}>{currentSkill.lines} Zeilen · {Math.round(currentSkill.size / 1024)}KB</span>
+            )}
+          </div>
+
+          {/* Tabs */}
+          <div style={S.tabBar}>
+            {["preview", "raw"].map((tab) => (
+              <button key={tab} style={S.tab(activeTab === tab)} onClick={() => setActiveTab(tab)}>
+                {tab === "preview" ? "📄 Vorschau" : "📝 Raw Markdown"}
+              </button>
+            ))}
+          </div>
+
+          {/* Toolbar */}
+          {currentSkill && (
+            <div style={S.toolbar}>
+              <button style={S.tbBtn} onClick={copySkill}>📋 Kopieren</button>
+              <button style={S.tbBtn} onClick={() => downloadSkill()}>⬇️ Download .md</button>
+              <button style={{ ...S.tbBtn, background: "rgba(168,85,247,0.1)", border: "1px solid rgba(168,85,247,0.25)", color: "#c084fc" }} onClick={() => { setChatInput("Analysiere und optimiere diesen Skill: identifiziere fehlende Abschnitte, schwache Formulierungen und konkrete Verbesserungen."); }}>
+                ✨ Mit Bot optimieren
+              </button>
+            </div>
+          )}
+
+          {/* Content */}
+          {!currentSkill ? (
+            <div style={S.emptyState}>
+              <div style={{ fontSize: 48, marginBottom: 8 }}>📄</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#e2e8f0" }}>Kein Skill generiert</div>
+              <div style={{ fontSize: 13, color: "#64748b", maxWidth: 280 }}>Konfiguriere deinen Skill links und klicke auf "PowerSkill Generieren"</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 16, width: "100%", maxWidth: 280 }}>
+                {["17 Pflichtabschnitte", "Mermaid Workflows", "Kompetenzmatrix", "Qualitäts-Checkliste"].map((f) => (
+                  <div key={f} style={{ background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 8, padding: "6px 10px", fontSize: 11, color: "#818cf8", textAlign: "center" }}>{f}</div>
+                ))}
+              </div>
+            </div>
+          ) : activeTab === "preview" ? (
+            <div style={S.previewContent}>
+              <SimpleMarkdown content={currentSkill.content} />
+            </div>
+          ) : (
+            <div style={S.rawContent}>
+              <textarea
+                style={S.rawTA}
+                value={currentSkill.content}
+                onChange={(e) => setCurrentSkill((sk) => ({ ...sk, content: e.target.value, lines: e.target.value.split("\n").length, size: e.target.value.length }))}
+                spellCheck={false}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: CHAT PANEL */}
+        <div style={S.panel}>
+          <div style={S.panelHdr}>
+            <span>💬</span>
+            <span style={S.panelTitle}>Skill Assistant</span>
+            {isChatting && <span style={{ fontSize: 11, color: "#818cf8", animation: "pulse 1s infinite" }}>Antwortet...</span>}
+          </div>
+
+          {/* Chat Messages */}
+          <div style={S.chatMessages}>
+            {/* Welcome message */}
+            <div style={S.msgBubble("assistant")}>
+              <div style={S.msgAvatar("assistant")}>🧠</div>
+              <div style={S.msgContent("assistant")}>
+                <ChatText text={"**Super-Skill Assistant** bereit!\n\nIch helfe dir bei:\n• Skill-Scope Definition & Optimierung\n• Review nach 17-Abschnitte-Struktur\n• Konkrete Verbesserungsvorschläge\n• Mermaid-Workflows & Prompt Engineering\n\nGeneriere zuerst einen Skill — dann kann ich ihn direkt analysieren und optimieren!"} />
+                <div style={{ fontSize: 10, color: "#64748b", marginTop: 4 }}>Jetzt</div>
+              </div>
+            </div>
+
+            {chatHistory.map((msg, i) => (
+              <div key={i} style={S.msgBubble(msg.role)}>
+                <div style={S.msgAvatar(msg.role)}>{msg.role === "user" ? "👤" : "🧠"}</div>
+                <div style={S.msgContent(msg.role)}>
+                  <ChatText text={msg.content} />
+                </div>
+              </div>
+            ))}
+
+            {isChatting && (
+              <div style={S.msgBubble("assistant")}>
+                <div style={S.msgAvatar("assistant")}>🧠</div>
+                <div style={S.msgContent("assistant")}>
+                  <div style={{ display: "flex", gap: 4, padding: "2px 0" }}>
+                    {[0, 1, 2].map((i) => <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: "#6366f1", animation: `pulse 1.4s ${i * 0.2}s infinite` }} />)}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Quick Actions */}
+          {currentSkill && (
+            <div style={{ padding: "6px 12px", display: "flex", flexWrap: "wrap", gap: 4, borderTop: "1px solid rgba(99,102,241,0.1)" }}>
+              {[
+                ["🔍 Reviewen", "Reviewe diesen Skill vollständig gegen die 17-Pflichtabschnitte-Checkliste. Liste fehlende oder schwache Abschnitte auf."],
+                ["✨ Optimieren", "Optimiere diesen Skill. Verbessere schwache Abschnitte, ergänze fehlende Anti-Patterns und stärke die Kompetenzmatrix. Gib den vollständigen überarbeiteten Skill aus."],
+                ["📊 Qualitäts-Score", "Bewerte diesen Skill nach den 4 Qualitätskategorien (Vollständigkeit 30%, Inhalt 40%, Format 20%, Standards 10%) und gib einen Gesamt-Score aus."],
+              ].map(([label, prompt]) => (
+                <button key={label} onClick={() => { setChatInput(prompt); }} style={{ padding: "3px 8px", borderRadius: 6, border: "1px solid rgba(99,102,241,0.2)", background: "rgba(99,102,241,0.05)", color: "#818cf8", fontSize: 10, fontWeight: 600, cursor: "pointer" }}>{label}</button>
+              ))}
+            </div>
+          )}
+
+          {/* Chat Input */}
+          <div style={S.chatInputArea}>
+            <textarea
+              style={S.chatTA}
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={handleChatKey}
+              placeholder={currentSkill ? "Skill optimieren, Fragen stellen, Abschnitte verbessern..." : "Fragen zu PowerSkills, Prompt Engineering, Mermaid..."}
+              rows={2}
+              disabled={isChatting}
+            />
+            <button style={S.sendBtn(isChatting || !chatInput.trim())} onClick={sendChat} disabled={isChatting || !chatInput.trim()}>
+              {isChatting ? "Antwortet..." : "➤ Senden (Enter)"}
+            </button>
+            <div style={{ fontSize: 10, color: "#64748b", marginTop: 4, textAlign: "right" }}>Enter = Senden · Shift+Enter = Neue Zeile</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+const domContainer = document.getElementById('root');
+const root = ReactDOM.createRoot(domContainer);
+root.render(React.createElement(SuperSkillApp));
+  </script>
+</body>
+</html>
