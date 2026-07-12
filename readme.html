@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>telllmeeedrei – Telegram AI Bot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0d0014;
+    --surface:   #160020;
+    --card:      #1e002e;
+    --border:    #3d005a;
+    --accent1:   #cc44ff;
+    --accent2:   #ff44cc;
+    --accent3:   #44ffcc;
+    --accent4:   #ffcc44;
+    --text:      #f0d6ff;
+    --muted:     #9966bb;
+    --code-bg:   #0a0012;
+    --mono:      'Space Mono', monospace;
+    --sans:      'Syne', sans-serif;
+    --radius:    14px;
+    --glow1:     0 0 30px rgba(204,68,255,0.35);
+    --glow2:     0 0 30px rgba(255,68,204,0.35);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── GRID NOISE OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(204,68,255,0.03) 39px, rgba(204,68,255,0.03) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(204,68,255,0.03) 39px, rgba(204,68,255,0.03) 40px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── AMBIENT ORBS ── */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: .45;
+  }
+  .orb-a { width: 600px; height: 600px; background: #7700cc; top: -200px; right: -100px; animation: drift 18s ease-in-out infinite; }
+  .orb-b { width: 500px; height: 500px; background: #cc0077; bottom: 10%; left: -150px; animation: drift 22s ease-in-out infinite reverse; }
+  .orb-c { width: 300px; height: 300px; background: #00ccaa; top: 60%; right: 10%; animation: drift 14s ease-in-out infinite 4s; }
+  @keyframes drift { 0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(40px,-30px) scale(1.08);} }
+
+  /* ── LAYOUT ── */
+  .wrapper { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 80px 24px 60px;
+    position: relative;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(204,68,255,0.12);
+    border: 1px solid rgba(204,68,255,0.3);
+    border-radius: 999px;
+    padding: 6px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent1);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+  .hero-badge::before { content: '●'; font-size: 8px; animation: blink 1.8s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  .hero-title {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: clamp(3rem, 8vw, 7rem);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, #fff 0%, var(--accent1) 40%, var(--accent2) 70%, var(--accent4) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  .hero-sub {
+    font-family: var(--mono);
+    font-size: clamp(0.75rem, 2vw, 1rem);
+    color: var(--muted);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  .hero-desc {
+    max-width: 600px;
+    font-size: 1.15rem;
+    color: #c4a3e0;
+    margin-bottom: 48px;
+  }
+
+  .hero-cta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 28px;
+    border-radius: var(--radius);
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .15s;
+    cursor: pointer;
+    border: none;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    color: #fff;
+    box-shadow: var(--glow1);
+  }
+  .btn-primary:hover { box-shadow: 0 0 50px rgba(204,68,255,.6); }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--accent1); color: var(--accent1); }
+
+  /* ── STATS BAR ── */
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    padding: 40px 24px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  .stat-pill {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 10px 22px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stat-pill strong { color: var(--accent1); }
+
+  /* ── SECTIONS ── */
+  section { padding: 80px 0; }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent1);
+    margin-bottom: 16px;
+  }
+
+  h2 {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+    color: #fff;
+  }
+
+  .section-intro {
+    color: var(--muted);
+    max-width: 560px;
+    margin-bottom: 56px;
+    font-size: 1.05rem;
+  }
+
+  /* ── FEATURE GRID ── */
+  .feat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .feat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s, border-color .2s, box-shadow .2s;
+  }
+  .feat-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent1);
+    box-shadow: var(--glow1);
+  }
+  .feat-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(204,68,255,.06), transparent);
+    pointer-events: none;
+  }
+
+  .feat-icon {
+    font-size: 2rem;
+    margin-bottom: 16px;
+    display: block;
+  }
+
+  .feat-title {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .feat-desc {
+    font-size: 0.88rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .feat-tag {
+    display: inline-block;
+    margin-top: 14px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    background: rgba(204,68,255,.12);
+    color: var(--accent1);
+    border: 1px solid rgba(204,68,255,.25);
+  }
+
+  /* ── CODE BLOCKS ── */
+  .code-wrap {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin: 24px 0;
+  }
+
+  .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: rgba(255,255,255,.03);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .code-dots { display: flex; gap: 6px; }
+  .code-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .code-dot:nth-child(1){ background:#ff5f57; }
+  .code-dot:nth-child(2){ background:#febc2e; }
+  .code-dot:nth-child(3){ background:#28c840; }
+
+  .code-lang {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  pre {
+    padding: 24px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.83rem;
+    line-height: 1.7;
+    color: #e2c8ff;
+  }
+
+  /* Syntax highlight colours */
+  .kw  { color: #cc44ff; }
+  .fn  { color: #44ffcc; }
+  .st  { color: #ffcc44; }
+  .cm  { color: #664499; font-style: italic; }
+  .nu  { color: #ff44cc; }
+
+  /* ── CMD TABLE ── */
+  .cmd-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    margin: 24px 0;
+  }
+  .cmd-table th {
+    text-align: left;
+    padding: 12px 16px;
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent1);
+  }
+  .cmd-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(61,0,90,.5);
+    vertical-align: top;
+  }
+  .cmd-table tr:last-child td { border-bottom: none; }
+  .cmd-table tr:hover td { background: rgba(204,68,255,.05); }
+  code {
+    font-family: var(--mono);
+    background: rgba(204,68,255,.12);
+    color: var(--accent1);
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-size: 0.85em;
+  }
+
+  /* ── ARCH DIAGRAM ── */
+  .arch {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px 32px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .arch-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 12px 0; }
+  .arch-box {
+    background: rgba(204,68,255,.1);
+    border: 1px solid rgba(204,68,255,.3);
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent1);
+    white-space: nowrap;
+  }
+  .arch-box.green { background: rgba(68,255,204,.1); border-color: rgba(68,255,204,.3); color: var(--accent3); }
+  .arch-box.yellow { background: rgba(255,204,68,.1); border-color: rgba(255,204,68,.3); color: var(--accent4); }
+  .arch-box.pink { background: rgba(255,68,204,.1); border-color: rgba(255,68,204,.3); color: var(--accent2); }
+  .arch-arrow { text-align: center; color: var(--muted); font-size: 22px; line-height: 1; margin: 4px 0; }
+  .arch-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 8px; }
+
+  /* ── AUDIT TABLE ── */
+  .audit-grid { display: grid; gap: 12px; }
+  .audit-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 3px solid;
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: start;
+  }
+  .audit-item.ok   { border-left-color: #28c840; }
+  .audit-item.warn { border-left-color: #febc2e; }
+  .audit-item.crit { border-left-color: #ff5f57; }
+
+  .audit-icon { font-size: 1.2rem; padding-top: 2px; }
+  .audit-content h4 { font-size: 0.95rem; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .audit-content p { font-size: 0.83rem; color: var(--muted); }
+  .audit-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    align-self: center;
+  }
+  .audit-badge.ok   { background: rgba(40,200,64,.15);  color: #28c840; border: 1px solid rgba(40,200,64,.3); }
+  .audit-badge.warn { background: rgba(254,188,46,.15); color: #febc2e; border: 1px solid rgba(254,188,46,.3); }
+  .audit-badge.crit { background: rgba(255,95,87,.15);  color: #ff5f57; border: 1px solid rgba(255,95,87,.3); }
+
+  /* ── ENV TABLE ── */
+  .env-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .env-table th { text-align:left; padding:10px 14px; color:var(--accent1); font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.1em; background:var(--card); border-bottom:1px solid var(--border); }
+  .env-table td { padding:10px 14px; border-bottom:1px solid rgba(61,0,90,.4); }
+  .env-table tr:last-child td { border:none; }
+  .req  { color: #ff5f57; }
+  .opt  { color: #febc2e; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 24px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  footer strong { color: var(--accent1); }
+
+  /* ── DIVIDER ── */
+  .divider {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 0;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+
+  @media (max-width: 600px) {
+    .feat-grid { grid-template-columns: 1fr; }
+    .hero-cta { flex-direction: column; align-items: center; }
+    .audit-item { grid-template-columns: auto 1fr; }
+    .audit-badge { grid-column: 2; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Ambient -->
+<div class="orb orb-a"></div>
+<div class="orb orb-b"></div>
+<div class="orb orb-c"></div>
+
+<!-- ═══ HERO ══════════════════════════════════════════════════════════════ -->
+<header class="hero">
+  <div class="hero-badge">Live · Railway Deployment · Polling Mode</div>
+  <h1 class="hero-title">telllmeeedrei</h1>
+  <p class="hero-sub">Telegram AI Bot · Python · FastAPI · Groq · Claude</p>
+  <p class="hero-desc">
+    Ein vollständiger, modularer Telegram-Bot mit KI-Chat, Voice-Klonung, Bildgenerierung,
+    Musikerkennung, Videoerstellung, Brain-Speicher (Supabase), E-Mail-Batches, YouTube-Analysen
+    und mehr – alles in einem stabilen Polling-Loop auf Railway.
+  </p>
+  <div class="hero-cta">
+    <a href="#quickstart" class="btn btn-primary">⚡ Quickstart</a>
+    <a href="#audit"      class="btn btn-outline">🔍 Audit Report</a>
+    <a href="#commands"   class="btn btn-outline">📋 Alle Commands</a>
+  </div>
+</header>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat-pill"><strong>40+</strong> Telegram-Commands</div>
+  <div class="stat-pill"><strong>30+</strong> Python-Module</div>
+  <div class="stat-pill"><strong>Groq</strong> LLM + Whisper</div>
+  <div class="stat-pill"><strong>Claude 3.5</strong> Code-Agent</div>
+  <div class="stat-pill"><strong>Supabase</strong> Brain-Storage</div>
+  <div class="stat-pill"><strong>FLUX.1</strong> Bildgenerierung</div>
+  <div class="stat-pill"><strong>Lyria 3 / Suno</strong> Musik</div>
+  <div class="stat-pill"><strong>Dashscope</strong> Video + Bild-Edit</div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══ ARCHITEKTUR ════════════════════════════════════════════════════════ -->
+<section id="architecture">
+  <div class="wrapper">
+    <p class="section-label">// Architektur</p>
+    <h2>Wie alles zusammenhängt</h2>
+    <p class="section-intro">Polling-Loop in FastAPI, modulare Handler, Supabase als Persistenz-Layer, externe KI-APIs für alle generativen Aufgaben.</p>
+
+    <div class="arch">
+      <div class="arch-label">Telegram Client</div>
+      <div class="arch-row">
+        <div class="arch-box">📱 User</div>
+      </div>
+      <div class="arch-arrow">↕</div>
+      <div class="arch-label">Polling Loop (main.py + bot_state.py)</div>
+      <div class="arch-row">
+        <div class="arch-box">handlers_chat.py</div>
+        <div class="arch-box">handlers_cmd.py</div>
+        <div class="arch-box">handlers_media.py</div>
+      </div>
+      <div class="arch-arrow">↕</div>
+      <div class="arch-label">Core Layer</div>
+      <div class="arch-row">
+        <div class="arch-box green">bot_ai.py</div>
+        <div class="arch-box green">brain.py</div>
+        <div class="arch-box green">guard.py</div>
+        <div class="arch-box green">vectorbrain.py</div>
+        <div class="arch-box green">agent.py</div>
+      </div>
+      <div class="arch-arrow">↕</div>
+      <div class="arch-label">Feature-Module</div>
+      <div class="arch-row">
+        <div class="arch-box yellow">imgrem.py · imgedi.py</div>
+        <div class="arch-box yellow">olko.py · claude_code.py</div>
+        <div class="arch-box yellow">textvideo.py · ttv26.py</div>
+        <div class="arch-box yellow">emgen.py · voicecl.py</div>
+        <div class="arch-box yellow">lyria_music.py · suno_music.py</div>
+        <div class="arch-box yellow">ytscript.py · search.py</div>
+      </div>
+      <div class="arch-arrow">↕</div>
+      <div class="arch-label">Externe APIs</div>
+      <div class="arch-row">
+        <div class="arch-box pink">Groq (LLM + Whisper + TTS)</div>
+        <div class="arch-box pink">Anthropic (Claude 3.5)</div>
+        <div class="arch-box pink">HuggingFace (FLUX / MusicGen)</div>
+        <div class="arch-box pink">DashScope (Video / Bild-Edit)</div>
+        <div class="arch-box pink">Google GenAI (Lyria 3)</div>
+        <div class="arch-box pink">Supabase (Brain DB)</div>
+        <div class="arch-box pink">SerpAPI (Web-Suche)</div>
+        <div class="arch-box pink">AudD (Song-Erkennung)</div>
+        <div class="arch-box pink">Gmail API (E-Mail-Batch)</div>
+        <div class="arch-box pink">SunoAPI (Musik-Gen)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══ FEATURES ══════════════════════════════════════════════════════════ -->
+<section id="features">
+  <div class="wrapper">
+    <p class="section-label">// Features</p>
+    <h2>Was der Bot kann</h2>
+    <p class="section-intro">Jedes Feature ist in einem eigenen Modul gekapselt und über Commands oder automatische Erkennung erreichbar.</p>
+
+    <div class="feat-grid">
+
+      <div class="feat-card">
+        <span class="feat-icon">🧠</span>
+        <div class="feat-title">KI-Chat mit Persönlichkeit</div>
+        <div class="feat-desc">Groq LLaMA-4 Scout mit automatischem Fallback auf LLaMA-3.3-70B, Mixtral und Gemma2. Kontext-History (40 Nachrichten), anpassbares System-Prompt pro Chat.</div>
+        <span class="feat-tag">bot_ai.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">💾</span>
+        <div class="feat-title">Brain (Supabase-Speicher)</div>
+        <div class="feat-desc">Chats, Texte und Dateien dauerhaft per Chat-ID in Supabase speichern. Semantische Suche via Sentence-Transformers oder lokalem Fallback. Checkbox-UI zum Löschen.</div>
+        <span class="feat-tag">brain.py · vectorbrain.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">🎤</span>
+        <div class="feat-title">Voice: Transkription + TTS</div>
+        <div class="feat-desc">Whisper-Large-V3-Turbo transkribiert Sprachnachrichten. Groq Orpheus-TTS oder gTTS als Fallback. Live-Voice-Stream in kurzen Chunks. Voice-Klonung mit XTTS-V2.</div>
+        <span class="feat-tag">bot_ai.py · voicecl.py · voicestream.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">🖼️</span>
+        <div class="feat-title">Bildgenerierung + Editing</div>
+        <div class="feat-desc">FLUX.1-schnell über HuggingFace Router generiert Bilder. Qwen-Image-Edit (DashScope) bearbeitet hochgeladene Bilder auf Anweisung. Llama-4-Scout Vision analysiert Bilder.</div>
+        <span class="feat-tag">imgrem.py · imgedi.py · vision.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">🎵</span>
+        <div class="feat-title">Musikgenerierung</div>
+        <div class="feat-desc">Lyria 3 (Google GenAI), Suno v3.5 API, MusicGen Large via HuggingFace Hub als Fallback-Kaskade. Song-Erkennung (normal + Humming) mit AudD.</div>
+        <span class="feat-tag">lyria_music.py · suno_music.py · thesong.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">🎬</span>
+        <div class="feat-title">Video-Generierung</div>
+        <div class="feat-desc">Wan2.2 Text-to-Video und Image-to-Video über DashScope. Async Polling mit automatischem Modell-Fallback. Abbruch via /stopvideo jederzeit möglich.</div>
+        <span class="feat-tag">ttv26.py · textvideo.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">💻</span>
+        <div class="feat-title">Claude Code-Agent</div>
+        <div class="feat-desc">Claude 3.5 Sonnet generiert und bearbeitet Code. Pydantic-strukturierte JSON-Antwort, automatischer Download als Datei. Reply auf Code für direkte Bearbeitung.</div>
+        <span class="feat-tag">claude_code.py · olko.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">🔍</span>
+        <div class="feat-title">Web-Suche</div>
+        <div class="feat-desc">SerpAPI Google-Suche via ? oder ! Prefix. Formatierte HTML-Antworten mit Answer-Box und Knowledge-Graph. Integration in Agent und Workflow.</div>
+        <span class="feat-tag">search.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">📺</span>
+        <div class="feat-title">YouTube-Analyse</div>
+        <div class="feat-desc">Automatische URL-Erkennung. Transcript + Zusammenfassung via youtube-transcript-api. Export als PDF oder TXT. Callback-Buttons für verschiedene Ansichten.</div>
+        <span class="feat-tag">ytscript.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">🤖</span>
+        <div class="feat-title">Agentic Loop</div>
+        <div class="feat-desc">Vollständiger Tool-Use-Agent mit Web-Suche, Brain-Suche, Brain-Listen und Brain-Laden. SuperAgent und OpenClaw als spezialisierte Agenten-Varianten.</div>
+        <span class="feat-tag">agent.py · superagent.py · openclaw.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">📧</span>
+        <div class="feat-title">E-Mail-Batch (Gmail)</div>
+        <div class="feat-desc">OAuth2-Auth für Gmail. Empfängerlisten aus Excel/CSV/PDF. Personalisierte Mails mit {name}-Platzhaltern. Preview + Bestätigungs-Button vor dem Senden.</div>
+        <span class="feat-tag">emgen.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">🔄</span>
+        <div class="feat-title">Datei-Konvertierung</div>
+        <div class="feat-desc">Universal-Konverter: PDF, DOCX, Excel, CSV, JSON, HTML, Markdown, MP3 (TTS), Chart-Bilder. Aus Dateien oder direkt aus Text. Parser + Code-Fallback-Pipeline.</div>
+        <span class="feat-tag">parser.py · dv.py · codeinterpreter.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">🛡️</span>
+        <div class="feat-title">Rate-Limiting + Guard</div>
+        <div class="feat-desc">Pro-Action-Buckets (Chat, Agent, Bild, Video, E-Mail). Text-Moderation mit Regex-Patterns. Privacy-Mode deaktiviert Chat-Persistenz. Kein Dependency auf externe Dienste.</div>
+        <span class="feat-tag">guard.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">📣</span>
+        <div class="feat-title">Social-Media-Workflow</div>
+        <div class="feat-desc">KI-generiertes Content-Paket: Hook, Script, Caption, Hashtags, Shotlist, Checklist + optimale Posting-Zeiten für Instagram, TikTok und LinkedIn.</div>
+        <span class="feat-tag">workflow.py · social.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">🔁</span>
+        <div class="feat-title">Polling-Watchdog</div>
+        <div class="feat-desc">Automatisches Löschen von Railway-gesetzten Webhooks alle 5 Minuten. Exponential Backoff bei Polling-Fehlern. Auto-Restart des inneren Loops. Startup-Greeting.</div>
+        <span class="feat-tag">main.py</span>
+      </div>
+
+      <div class="feat-card">
+        <span class="feat-icon">🌐</span>
+        <div class="feat-title">Mini Apps</div>
+        <div class="feat-desc">Live-Voice-Chat als WebSocket-Telegram-Mini-App. Tower-Defense-Game als Telegram-Web-App. YouTube Crystal-Ball-Viewer. SoundCloud-Player-Widget.</div>
+        <span class="feat-tag">voice_mini_app.py · mini_app.py</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══ QUICKSTART ════════════════════════════════════════════════════════ -->
+<section id="quickstart">
+  <div class="wrapper">
+    <p class="section-label">// Quickstart</p>
+    <h2>In 5 Minuten live</h2>
+    <p class="section-intro">Railway-Deployment via Git-Push. Keine Docker-Konfiguration nötig.</p>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+        <span class="code-lang">bash · Installation</span>
+      </div>
+      <pre><span class="cm"># 1. Repository klonen</span>
+git clone https://github.com/dein-user/telllmeeedrei.git
+cd telllmeeedrei
+
+<span class="cm"># 2. Dependencies installieren</span>
+pip install -r requirements.txt
+
+<span class="cm"># 3. Umgebungsvariablen setzen (siehe .env.example)</span>
+cp .env.example .env
+<span class="cm"># → öffne .env und trage alle Keys ein</span>
+
+<span class="cm"># 4. Lokal starten</span>
+uvicorn main:app --reload --port 10000
+
+<span class="cm"># 5. Auf Railway deployen</span>
+railway up</pre>
+    </div>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+        <span class="code-lang">python · Bot in eigenes Projekt einbinden</span>
+      </div>
+      <pre><span class="cm"># Einzelne Module importieren und wiederverwenden</span>
+<span class="kw">from</span> brain <span class="kw">import</span> save_text, load_entry, list_entries
+<span class="kw">from</span> bot_ai <span class="kw">import</span> generate_response, transcribe_voice
+<span class="kw">from</span> imgrem <span class="kw">import</span> generate_image
+<span class="kw">from</span> search <span class="kw">import</span> web_search, format_search_results_for_user
+<span class="kw">from</span> guard  <span class="kw">import</span> can_process_text
+
+<span class="cm"># Beispiel: KI-Antwort generieren</span>
+<span class="kw">async def</span> <span class="fn">my_handler</span>(chat_id, user_message):
+    decision = <span class="fn">can_process_text</span>(chat_id, user_message)
+    <span class="kw">if not</span> decision.allowed:
+        <span class="kw">return</span> decision.message
+
+    reply = <span class="kw">await</span> <span class="fn">generate_response</span>(chat_id, user_message)
+    <span class="kw">return</span> reply
+
+<span class="cm"># Beispiel: Bild generieren</span>
+<span class="kw">async def</span> <span class="fn">make_image</span>(prompt):
+    img_buffer = <span class="kw">await</span> <span class="fn">generate_image</span>(prompt, width=<span class="nu">1024</span>, height=<span class="nu">1024</span>)
+    <span class="kw">if</span> img_buffer:
+        <span class="kw">return</span> img_buffer  <span class="cm"># BytesIO-Objekt, direkt sendbar</span>
+
+<span class="cm"># Beispiel: Brain-Eintrag speichern</span>
+result = <span class="kw">await</span> <span class="fn">save_text</span>(chat_id=<span class="st">"12345"</span>, text=<span class="st">"Notiz"</span>, title=<span class="st">"Meeting"</span>)
+print(result)  <span class="cm"># "Text gespeichert. ID: ..."</span></pre>
+    </div>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+        <span class="code-lang">python · Eigenen Command registrieren</span>
+      </div>
+      <pre><span class="cm"># In main.py – nach dem Muster der vorhandenen Handler:</span>
+<span class="kw">from</span> telegram.ext <span class="kw">import</span> CommandHandler
+<span class="kw">from</span> mein_modul <span class="kw">import</span> mein_handler
+
+application.add_handler(<span class="fn">CommandHandler</span>(<span class="st">"meincommand"</span>, mein_handler))
+
+<span class="cm"># Minimal-Handler Template:</span>
+<span class="kw">async def</span> <span class="fn">mein_handler</span>(update, context):
+    chat_id = <span class="fn">str</span>(update.effective_chat.id)
+    payload = <span class="st">" "</span>.join(context.args).strip()
+    <span class="kw">if not</span> payload:
+        <span class="kw">await</span> update.message.<span class="fn">reply_text</span>(<span class="st">"Nutzung: /meincommand &lt;text&gt;"</span>)
+        <span class="kw">return</span>
+    loading = <span class="kw">await</span> update.message.<span class="fn">reply_text</span>(<span class="st">"⏳ Verarbeite..."</span>)
+    result = <span class="kw">await</span> meine_logik(payload)
+    <span class="kw">await</span> context.bot.<span class="fn">edit_message_text</span>(
+        chat_id=chat_id,
+        message_id=loading.message_id,
+        text=result
+    )</pre>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══ ENV VARS ═══════════════════════════════════════════════════════════ -->
+<section id="env">
+  <div class="wrapper">
+    <p class="section-label">// Konfiguration</p>
+    <h2>Umgebungsvariablen</h2>
+    <p class="section-intro">Alle Secrets werden als Railway-Variablen gesetzt. Keine .env-Datei im Repository commiten.</p>
+
+    <div class="code-wrap" style="overflow-x:auto;">
+      <div class="code-header">
+        <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+        <span class="code-lang">env</span>
+      </div>
+      <table class="env-table" style="margin:0;">
+        <thead>
+          <tr><th>Variable</th><th>Pflicht</th><th>Beschreibung</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>TELEGRAM_BOT_TOKEN</code></td><td><span class="req">●</span> Pflicht</td><td>BotFather-Token</td></tr>
+          <tr><td><code>GROQ_API_KEY</code></td><td><span class="req">●</span> Pflicht</td><td>Groq-API-Key (LLM + Whisper + TTS)</td></tr>
+          <tr><td><code>SUPABASE_URL</code></td><td><span class="req">●</span> Pflicht</td><td>Supabase-Projekt-URL</td></tr>
+          <tr><td><code>SUPABASE_KEY</code></td><td><span class="req">●</span> Pflicht</td><td>Supabase anon/service Key</td></tr>
+          <tr><td><code>ANTHROPIC_API_KEY</code></td><td><span class="opt">○</span> Optional</td><td>Für Claude Code-Agent (/clcode)</td></tr>
+          <tr><td><code>HF_TOKEN</code></td><td><span class="opt">○</span> Optional</td><td>HuggingFace-Token (FLUX, MusicGen)</td></tr>
+          <tr><td><code>DASHSCOPE_API_KEY</code></td><td><span class="opt">○</span> Optional</td><td>Aliyun DashScope (Video + Bild-Edit)</td></tr>
+          <tr><td><code>GEMINI_API_KEY</code></td><td><span class="opt">○</span> Optional</td><td>Google GenAI (Lyria 3 Musik)</td></tr>
+          <tr><td><code>SERPAPI_KEY</code></td><td><span class="opt">○</span> Optional</td><td>SerpAPI Google-Suche</td></tr>
+          <tr><td><code>AUDD_API_TOKEN</code></td><td><span class="opt">○</span> Optional</td><td>AudD Song-Erkennung</td></tr>
+          <tr><td><code>OWNER_CHAT_ID</code></td><td><span class="opt">○</span> Optional</td><td>Empfänger der Startup-Nachricht</td></tr>
+          <tr><td><code>GMAIL_CREDENTIALS_PATH</code></td><td><span class="opt">○</span> Optional</td><td>Pfad zur credentials.json für Gmail OAuth</td></tr>
+          <tr><td><code>VISION_MODEL</code></td><td><span class="opt">○</span> Optional</td><td>Überschreibt Standard-Vision-Modell</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══ COMMANDS ══════════════════════════════════════════════════════════ -->
+<section id="commands">
+  <div class="wrapper">
+    <p class="section-label">// Commands</p>
+    <h2>Alle Bot-Befehle</h2>
+    <p class="section-intro">Vollständige Übersicht aller registrierten Commands. Viele Commands haben Aliase.</p>
+
+    <div style="overflow-x:auto;">
+    <table class="cmd-table">
+      <thead><tr><th>Command</th><th>Beschreibung</th><th>Modul</th></tr></thead>
+      <tbody>
+        <tr><td><code>/start</code></td><td>Willkommensmenü mit Befehlsliste</td><td>handlers_cmd.py</td></tr>
+        <tr><td><code>/chat &lt;text&gt;</code></td><td>Direkt mit KI chatten (Alias für Textnachricht)</td><td>bot_ai.py</td></tr>
+        <tr><td><code>/imagine &lt;prompt&gt;</code> · <code>/img</code></td><td>FLUX.1-schnell Bildgenerierung</td><td>imgrem.py</td></tr>
+        <tr><td><code>/edit &lt;anweisung&gt;</code> · <code>/bearbeiten</code></td><td>Bild-Edit-Modus (Reply auf Bild + Command)</td><td>imgedi.py</td></tr>
+        <tr><td><code>/vision</code> · <code>/analyze</code> · <code>/beschreib</code></td><td>Bild per KI analysieren (Reply auf Bild)</td><td>vision.py</td></tr>
+        <tr><td><code>/clcode &lt;prompt&gt;</code> · <code>/codeclaude</code></td><td>Claude 3.5 Code-Agent, Reply für Bearbeitung</td><td>claude_code.py</td></tr>
+        <tr><td><code>/code &lt;prompt&gt;</code></td><td>Code-Generierung via Groq</td><td>handlers_cmd.py</td></tr>
+        <tr><td><code>/agent &lt;aufgabe&gt;</code></td><td>Tool-Use-Agent (Web+Brain+Konvertierung)</td><td>agent.py</td></tr>
+        <tr><td><code>/superagent &lt;aufgabe&gt;</code></td><td>Erweiterter Agent mit 12 Schritten</td><td>superagent.py</td></tr>
+        <tr><td><code>/openclaw &lt;aufgabe&gt;</code></td><td>Agent mit Preset-Prompts und Buttons</td><td>openclaw.py</td></tr>
+        <tr><td><code>/workflow &lt;idee&gt;</code></td><td>Content-Paket (Hook, Script, Caption, Shotlist)</td><td>workflow.py</td></tr>
+        <tr><td><code>/social &lt;idee&gt;</code></td><td>Social-Media-Plan für IG/TikTok/LinkedIn</td><td>social.py</td></tr>
+        <tr><td><code>/upload</code></td><td>Datei ins Brain laden (Reply auf Datei)</td><td>brain.py</td></tr>
+        <tr><td><code>/synchromaster &lt;id&gt;</code></td><td>Brain-Eintrag als System-Prompt setzen</td><td>brain.py</td></tr>
+        <tr><td><code>/synchroall</code></td><td>Gesamtes Brain in Kontext laden</td><td>brain.py</td></tr>
+        <tr><td><code>/synchdata &lt;id&gt;</code></td><td>Einzelnen Brain-Eintrag in Kontext laden</td><td>brain.py</td></tr>
+        <tr><td><code>/listbrain</code></td><td>Brain-Einträge auflisten</td><td>brain.py</td></tr>
+        <tr><td><code>/brainlist</code></td><td>Brain-UI mit Checkbox-Löschfunktion</td><td>brainlist_handler.py</td></tr>
+        <tr><td><code>/brainindex</code></td><td>Brain semantisch indexieren (Vektoren)</td><td>vectorbrain.py</td></tr>
+        <tr><td><code>/semantic &lt;query&gt;</code></td><td>Semantische Brain-Suche</td><td>vectorbrain.py</td></tr>
+        <tr><td><code>/testbrain</code></td><td>Supabase-Verbindungstest</td><td>brain.py</td></tr>
+        <tr><td><code>/convert &lt;ziel&gt;</code></td><td>Datei konvertieren (Reply auf Datei)</td><td>parser.py</td></tr>
+        <tr><td><code>/textconvert &lt;ziel&gt; || &lt;text&gt;</code></td><td>Text zu Dateiformat konvertieren</td><td>parser.py</td></tr>
+        <tr><td><code>/yt &lt;url&gt;</code></td><td>YouTube-Transcript + Zusammenfassung</td><td>ytscript.py</td></tr>
+        <tr><td><code>/musik &lt;prompt&gt;</code></td><td>Musikgenerierung (Lyria → Suno → MusicGen)</td><td>lyria_music.py</td></tr>
+        <tr><td><code>/suno &lt;prompt&gt;</code></td><td>Direkte Suno v3.5 Generierung</td><td>suno_music.py</td></tr>
+        <tr><td><code>/freebeat &lt;prompt&gt;</code></td><td>MusicGen über HuggingFace</td><td>free_music.py</td></tr>
+        <tr><td><code>/humming</code> · <code>/summen</code></td><td>Song per Summen erkennen (AudD)</td><td>thesong.py</td></tr>
+        <tr><td><code>/textvideo &lt;prompt&gt;</code></td><td>Image-to-Video (Reply auf Foto)</td><td>textvideo.py</td></tr>
+        <tr><td><code>/ttv26 &lt;prompt&gt;</code></td><td>Reines Text-to-Video (Wan2.2)</td><td>ttv26.py</td></tr>
+        <tr><td><code>/stopvideo</code> · <code>/cancel</code></td><td>Laufende Video-Generierung abbrechen</td><td>handlers_cmd.py</td></tr>
+        <tr><td><code>/voicetoggle</code></td><td>Automatische Sprachantworten an/aus</td><td>bot_ai.py</td></tr>
+        <tr><td><code>/voiceclone &lt;name&gt;</code></td><td>Stimme klonen (Reply auf Audio)</td><td>voicecl.py</td></tr>
+        <tr><td><code>/myvoices</code></td><td>Geklonte Stimmen auflisten</td><td>voicecl.py</td></tr>
+        <tr><td><code>/speak &lt;voice&gt; | &lt;text&gt;</code></td><td>Text mit geklonter Stimme sprechen</td><td>voicecl.py</td></tr>
+        <tr><td><code>/startstream</code></td><td>Live-Voice-Stream aktivieren</td><td>voicestream.py</td></tr>
+        <tr><td><code>/endstream</code></td><td>Live-Voice-Stream beenden</td><td>voicestream.py</td></tr>
+        <tr><td><code>/livevoice</code></td><td>WebSocket Voice-Chat Mini App öffnen</td><td>voice_mini_app.py</td></tr>
+        <tr><td><code>/gmail_auth</code></td><td>Gmail OAuth-Flow starten</td><td>emgen.py</td></tr>
+        <tr><td><code>/gmail_code &lt;code&gt;</code></td><td>OAuth-Code einlösen</td><td>emgen.py</td></tr>
+        <tr><td><code>/mailbatch &lt;betreff&gt; || &lt;body&gt;</code></td><td>E-Mail-Batch vorbereiten (Reply auf Datei)</td><td>emgen.py</td></tr>
+        <tr><td><code>/privacy</code></td><td>Privacy-Modus togglen (kein Chat-Logging)</td><td>guard.py</td></tr>
+        <tr><td><code>/guard</code></td><td>Rate-Limit-Status anzeigen</td><td>guard.py</td></tr>
+        <tr><td><code>/audit</code></td><td>Modul-Selbsttest / Standard-Check</td><td>handlers_cmd.py</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══ AUDIT ══════════════════════════════════════════════════════════════ -->
+<section id="audit">
+  <div class="wrapper">
+    <p class="section-label">// Code-Audit</p>
+    <h2>Stärken, Schwächen &amp; Empfehlungen</h2>
+    <p class="section-intro">Detaillierter Review aller 30+ Module. Grün = gut gelöst, Gelb = verbesserungswürdig, Rot = kritisch.</p>
+
+    <div class="audit-grid">
+
+      <div class="audit-item ok">
+        <div class="audit-icon">✅</div>
+        <div class="audit-content">
+          <h4>Polling-Architektur mit Watchdog</h4>
+          <p><code>main.py</code> — Exponential Backoff, 5-Minuten-Watchdog der Webhooks automatisch löscht, starke Task-Referenz verhindert GC-Abbrüche. Sehr robust für Railway-Deployments.</p>
+        </div>
+        <span class="audit-badge ok">✓ SOLID</span>
+      </div>
+
+      <div class="audit-item ok">
+        <div class="audit-icon">✅</div>
+        <div class="audit-content">
+          <h4>Modell-Fallback-Kaskade</h4>
+          <p><code>bot_ai.py</code> — LLaMA-4-Scout → LLaMA-3.3-70B → Mixtral → Gemma2. Saubere Fehlerbehandlung mit 503/404-Erkennung. Kein Single-Point-of-Failure.</p>
+        </div>
+        <span class="audit-badge ok">✓ SOLID</span>
+      </div>
+
+      <div class="audit-item ok">
+        <div class="audit-icon">✅</div>
+        <div class="audit-content">
+          <h4>Guard / Rate-Limiter</h4>
+          <p><code>guard.py</code> — Action-spezifische Token-Bucket-Implementierung, automatische Bucket-Bereinigung, Privacy-Mode, Text-Moderation. Vollständig ohne externe Dependencies.</p>
+        </div>
+        <span class="audit-badge ok">✓ SOLID</span>
+      </div>
+
+      <div class="audit-item ok">
+        <div class="audit-icon">✅</div>
+        <div class="audit-content">
+          <h4>Brain + VectorBrain</h4>
+          <p><code>brain.py + vectorbrain.py</code> — Supabase-Integration mit fehlertoleranter Fallback-Logik. Hybride Suche (Vektor 82% + Lexikalisch 18%). Sentence-Transformer mit lokalem Hash-Fallback.</p>
+        </div>
+        <span class="audit-badge ok">✓ SOLID</span>
+      </div>
+
+      <div class="audit-item ok">
+        <div class="audit-icon">✅</div>
+        <div class="audit-content">
+          <h4>Universeller Parser / Konverter</h4>
+          <p><code>parser.py + dv.py</code> — Saubere Trennung von Extraktion und Konvertierung. Unterstützt 12 Zielformate. Code-Fallback via <code>codeinterpreter.py</code> bei Parser-Fehlern. Sehr vollständig.</p>
+        </div>
+        <span class="audit-badge ok">✓ SOLID</span>
+      </div>
+
+      <div class="audit-item ok">
+        <div class="audit-icon">✅</div>
+        <div class="audit-content">
+          <h4>Agent Tool-Loop</h4>
+          <p><code>agent.py</code> — Sauberer generischer Agentenloop mit Tool-Schema-Generierung, async Tool-Ausführung und Step-Limit. Korrekte Message-History-Verwaltung für Tool-Calls.</p>
+        </div>
+        <span class="audit-badge ok">✓ SOLID</span>
+      </div>
+
+      <div class="audit-item warn">
+        <div class="audit-icon">⚠️</div>
+        <div class="audit-content">
+          <h4>Doppelte Dateien: claude_code.py vs. claude_code_fixed.py</h4>
+          <p>Beide Dateien sind fast identisch. Nur <code>claude_code.py</code> wird in <code>main.py</code> importiert. <code>claude_code_fixed.py</code> und <code>handle_claude_code.py</code> (alte Version mit kaputtem <code>from olko import</code>) sollten gelöscht werden.</p>
+        </div>
+        <span class="audit-badge warn">⚠ CLEANUP</span>
+      </div>
+
+      <div class="audit-item warn">
+        <div class="audit-icon">⚠️</div>
+        <div class="audit-content">
+          <h4>Doppelte Dateien: brainlist_handler.py vs. brainlist_handler_fixed.py</h4>
+          <p>Inhaltlich identisch. Nur eine davon wird importiert. Die <code>_fixed.py</code>-Variante kann gelöscht werden, der Import in <code>main.py</code> ist bereits auf die nicht-fixed-Version gesetzt.</p>
+        </div>
+        <span class="audit-badge warn">⚠ CLEANUP</span>
+      </div>
+
+      <div class="audit-item warn">
+        <div class="audit-icon">⚠️</div>
+        <div class="audit-content">
+          <h4>Hardcoded API-Key in suno_music.py</h4>
+          <p><code>SUNO_API_KEY = "1e321224..."</code> ist direkt im Code. Sollte auf <code>os.getenv("SUNO_API_KEY")</code> umgestellt werden, bevor das Repository öffentlich gemacht wird.</p>
+        </div>
+        <span class="audit-badge warn">⚠ SICHERHEIT</span>
+      </div>
+
+      <div class="audit-item warn">
+        <div class="audit-icon">⚠️</div>
+        <div class="audit-content">
+          <h4>Hardcoded HF_TOKEN in free_music.py</h4>
+          <p><code>HF_TOKEN = "hf_GmKchic..."</code> direkt im Code statt <code>os.getenv</code>. Zwar auch via <code>os.getenv</code> gelesen, aber der Fallback-String steht im Klartext im Repository.</p>
+        </div>
+        <span class="audit-badge warn">⚠ SICHERHEIT</span>
+      </div>
+
+      <div class="audit-item warn">
+        <div class="audit-icon">⚠️</div>
+        <div class="audit-content">
+          <h4>handle_claude_code.py importiert nicht-existente Module</h4>
+          <p><code>from olko import claude_code_handler</code> und <code>last_generated_code</code>/<code>create_download_buffer</code> fehlen als Import. Diese Datei ist die alte Version und wird nicht verwendet – sollte gelöscht werden.</p>
+        </div>
+        <span class="audit-badge warn">⚠ TOTES CODE</span>
+      </div>
+
+      <div class="audit-item warn">
+        <div class="audit-icon">⚠️</div>
+        <div class="audit-content">
+          <h4>musika_music.py: Nicht produktionsreif</h4>
+          <p>Erwartet geklontes Musika-Repository unter <code>/app/musika</code>. Der Download läuft synchron im Konstruktor und blockiert den Start. Auf Railway wird das bei jedem Deploy über 2 GB laden. Deaktivieren oder lazy-load.</p>
+        </div>
+        <span class="audit-badge warn">⚠ PERFORMANCE</span>
+      </div>
+
+      <div class="audit-item warn">
+        <div class="audit-icon">⚠️</div>
+        <div class="audit-content">
+          <h4>Timeout-Bug in ttv26.py</h4>
+          <p><code>asyncio.get_event_loop().time() - asyncio.get_event_loop().time()</code> ergibt immer 0 und bricht nie ab. Die MAX_POLL_TIME_SECONDS-Prüfung ist damit wirkungslos. Muss mit <code>start_time = asyncio.get_event_loop().time()</code> vor der Schleife gefixt werden.</p>
+        </div>
+        <span class="audit-badge warn">⚠ BUG</span>
+      </div>
+
+      <div class="audit-item warn">
+        <div class="audit-icon">⚠️</div>
+        <div class="audit-content">
+          <h4>youtube.py parallel zu ytscript.py</h4>
+          <p>Zwei YouTube-Module mit überlappender Funktionalität. <code>youtube.py</code> verwendet die YouTube Data API v3, <code>ytscript.py</code> die youtube-transcript-api. In <code>main.py</code> wird nur <code>ytscript.py</code> verwendet. <code>youtube.py</code> ist toter Code.</p>
+        </div>
+        <span class="audit-badge warn">⚠ CLEANUP</span>
+      </div>
+
+      <div class="audit-item warn">
+        <div class="audit-icon">⚠️</div>
+        <div class="audit-content">
+<h4>voice_mini_app.py: Hardcodierte Railway-URL</h4>
+          <p><code>wss://telllmeeedrei-production.up.railway.app/livevoice/ws/voice</code> steht fest im JS. Wird automatisch gebrochen wenn der Railway-Projektname geändert wird. Besser via Template-Variable oder dynamisch aus <code>window.location</code> lesen.</p>
+        </div>
+        <span class="audit-badge warn">⚠ MAINTENANCE</span>
+      </div>
+
+      <div class="audit-item crit">
+        <div class="audit-icon">🔴</div>
+        <div class="audit-content">
+          <h4>claude_code.py: Anthropic-Client ist nicht async</h4>
+          <p><code>client.messages.create()</code> der Anthropic-Library ist synchron. Der <code>await</code>-Aufruf in <code>claude_code.py</code> funktioniert nur weil die Library einen Coroutine-Wrapper hat – aber es blockiert den Event-Loop. Lösung: <code>await asyncio.to_thread(client.messages.create, ...)</code> oder AsyncAnthropic verwenden.</p>
+        </div>
+        <span class="audit-badge crit">✗ KRITISCH</span>
+      </div>
+
+      <div class="audit-item crit">
+        <div class="audit-icon">🔴</div>
+        <div class="audit-content">
+          <h4>brain.py: Supabase-Client ist synchron, wird in async aufgerufen</h4>
+          <p>Alle <code>get_supabase()</code>-Aufrufe laufen direkt im Event-Loop ohne <code>asyncio.to_thread</code>. Bei vielen gleichzeitigen Requests blockiert das den Polling-Loop. Alle Supabase-Aufrufe sollten in <code>asyncio.to_thread()</code> gewickelt werden.</p>
+        </div>
+        <span class="audit-badge crit">✗ KRITISCH</span>
+      </div>
+
+      <div class="audit-item crit">
+        <div class="audit-icon">🔴</div>
+        <div class="audit-content">
+          <h4>Kein Logging der nicht verwendeten voice_mini_app-Import-Fehler</h4>
+          <p><code>main.py</code> importiert <code>from voice_mini_app import app as voice_mini_app</code> ganz oben – noch vor FastAPI-Init. Falls <code>voice_mini_app.py</code> einen Fehler hat, crasht der gesamte Bot beim Start ohne klare Fehlermeldung. Lazy-Import oder try/except schützt davor.</p>
+        </div>
+        <span class="audit-badge crit">✗ KRITISCH</span>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══ SUPABASE SCHEMA ════════════════════════════════════════════════════ -->
+<section id="schema">
+  <div class="wrapper">
+    <p class="section-label">// Datenbank</p>
+    <h2>Supabase Schema</h2>
+    <p class="section-intro">Zwei Tabellen: <code>brain_entries</code> für alle Inhalte, <code>brain_vectors</code> für semantische Suche.</p>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+        <span class="code-lang">sql · Supabase Setup</span>
+      </div>
+      <pre><span class="cm">-- Tabelle für alle Brain-Einträge</span>
+<span class="kw">CREATE TABLE</span> brain_entries (
+  id          uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  user_id     text <span class="kw">NOT NULL</span>,
+  entry_type  text <span class="kw">NOT NULL</span>,   <span class="cm">-- 'chat' | 'safe_text' | 'file'</span>
+  title       text,
+  content     text,
+  metadata    jsonb,
+  created_at  timestamptz <span class="kw">DEFAULT</span> now()
+);
+
+<span class="cm">-- Index für schnelle User-Lookups</span>
+<span class="kw">CREATE INDEX</span> brain_entries_user_idx <span class="kw">ON</span> brain_entries(user_id);
+
+<span class="cm">-- RLS aktivieren</span>
+<span class="kw">ALTER TABLE</span> brain_entries <span class="kw">ENABLE ROW LEVEL SECURITY</span>;
+<span class="kw">CREATE POLICY</span> allow_all <span class="kw">ON</span> brain_entries <span class="kw">FOR ALL USING</span> (true);
+
+<span class="cm">-- Vektoren-Tabelle für semantische Suche</span>
+<span class="kw">CREATE TABLE</span> brain_vectors (
+  id          uuid <span class="kw">PRIMARY KEY DEFAULT</span> gen_random_uuid(),
+  user_id     text <span class="kw">NOT NULL</span>,
+  entry_id    text <span class="kw">NOT NULL</span>,
+  title       text,
+  content     text,
+  metadata    jsonb,
+  embedding   vector(<span class="nu">384</span>),  <span class="cm">-- pgvector Extension nötig</span>
+  <span class="kw">UNIQUE</span>(user_id, entry_id)
+);
+
+<span class="cm">-- pgvector Extension aktivieren (im Supabase-Dashboard)</span>
+<span class="kw">CREATE EXTENSION IF NOT EXISTS</span> vector;</pre>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ═══ MODULE OVERVIEW ════════════════════════════════════════════════════ -->
+<section id="modules">
+  <div class="wrapper">
+    <p class="section-label">// Module</p>
+    <h2>Dateistruktur</h2>
+    <p class="section-intro">Alle 30+ Python-Module auf einen Blick.</p>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <div class="code-dots"><div class="code-dot"></div><div class="code-dot"></div><div class="code-dot"></div></div>
+        <span class="code-lang">tree</span>
+      </div>
+      <pre>telllmeeedrei/
+├── <span class="kw">main.py</span>               <span class="cm"># FastAPI + Polling + Handler-Registrierung</span>
+├── bot_state.py          <span class="cm"># Globale States, Clients, Application-Objekt</span>
+├── bot_ai.py             <span class="cm"># LLM-Chat, Whisper-STT, Groq-TTS</span>
+├── bot_utils.py          <span class="cm"># Helpers, Agent-Tools, Konvertierungs-Pipeline</span>
+│
+├── <span class="fn">handlers_cmd.py</span>       <span class="cm"># Alle Command-Handler (größte Datei)</span>
+├── handlers_chat.py      <span class="cm"># Text-Messages, YouTube-Erkennung, Web-Suche</span>
+├── handlers_media.py     <span class="cm"># Foto, Voice, Audio, Dokument</span>
+│
+├── brain.py              <span class="cm"># Supabase Brain: CRUD für Chats/Texte/Dateien</span>
+├── vectorbrain.py        <span class="cm"># Semantische Suche mit Vektoren</span>
+├── brainlist_handler.py  <span class="cm"># Brain-UI mit Checkbox-Delete</span>
+├── guard.py              <span class="cm"># Rate-Limiter, Text-Moderation, Privacy-Mode</span>
+│
+├── <span class="st">agent.py</span>              <span class="cm"># Generischer Tool-Use-Agentenloop</span>
+├── superagent.py         <span class="cm"># SuperAgent (12 Steps, Brain-Zugriff)</span>
+├── openclaw.py           <span class="cm"># OpenClaw Agent mit Preset-Prompts</span>
+├── workflow.py           <span class="cm"># Content-Workflow-Bundle (JSON-Output)</span>
+├── social.py             <span class="cm"># Social-Media-Paket + Buffer-Integration</span>
+│
+├── imgrem.py             <span class="cm"># FLUX.1-schnell Bildgenerierung (HF Router)</span>
+├── imgedi.py             <span class="cm"># Qwen-Image-Edit via DashScope</span>
+├── vision.py             <span class="cm"># LLaMA-4-Scout Vision-Analyse</span>
+│
+├── lyria_music.py        <span class="cm"># Google Lyria 3 Musikgenerierung</span>
+├── suno_music.py         <span class="cm"># Suno v3.5 API</span>
+├── free_music.py         <span class="cm"># MusicGen via HF Router (Fallback)</span>
+├── hybrid_music.py       <span class="cm"># MusicGen → Riffusion → Stable Audio → Bark</span>
+├── thesong.py            <span class="cm"># AudD Song-Erkennung + Humming-Modus</span>
+│
+├── textvideo.py          <span class="cm"># Image-to-Video (Wan2.2, DashScope)</span>
+├── ttv26.py              <span class="cm"># Text-to-Video (Wan2.2-t2v, DashScope)</span>
+│
+├── <span class="fn">claude_code.py</span>        <span class="cm"># Claude 3.5 Code-Agent (Pydantic JSON)</span>
+├── olko.py               <span class="cm"># Claude Code: generate/edit/analyze Funktionen</span>
+├── codeinterpreter.py    <span class="cm"># Sandboxed Python/HTML Executor</span>
+│
+├── emgen.py              <span class="cm"># Gmail OAuth + E-Mail-Batch-Versand</span>
+├── parser.py             <span class="cm"># Universal-Konverter (12 Formate)</span>
+├── dv.py                 <span class="cm"># Datei-Extraktion + Erstellungs-Funktionen</span>
+├── search.py             <span class="cm"># SerpAPI Google-Suche</span>
+├── ytscript.py           <span class="cm"># YouTube Transcript + Zusammenfassung</span>
+│
+├── voicecl.py            <span class="cm"># Voice-Klonung (XTTS-v2)</span>
+├── voicestream.py        <span class="cm"># Live-Voice-Stream in Chunks</span>
+├── voice_mini_app.py     <span class="cm"># WebSocket Voice-Chat FastAPI-App</span>
+│
+├── mini_app.py           <span class="cm"># Tower-Defense-Game Mini App (Flask)</span>
+├── youtube_mini_app.py   <span class="cm"># YouTube Crystal Ball Mini App (FastAPI)</span>
+├── soundcloud_backend.py <span class="cm"># SoundCloud Widget-Helper</span>
+│
+├── health.py             <span class="cm"># Separater Health-Check-Endpoint</span>
+├── validate_polling_installation.py  <span class="cm"># Diagnose-Script</span>
+├── requirements.txt
+└── railway.json</pre>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ════════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<footer>
+  <div style="margin-bottom:12px; font-size:1.5rem;">🤖</div>
+  <div><strong>telllmeeedrei</strong> – Telegram AI Bot</div>
+  <div style="margin-top:8px; color:#664499;">
+    Powered by Groq · Claude · FLUX.1 · Lyria · Suno · Dashscope · Supabase · Railway
+  </div>
+  <div style="margin-top:16px; color:#443355; font-size:11px;">
+    README generiert mit ❤️ und Claude Sonnet 4.6
+  </div>
+</footer>
+
+</body>
+</html>
