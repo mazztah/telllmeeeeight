@@ -81,7 +81,7 @@ _savecode_locks: dict[str, asyncio.Lock] = {}
 
 PUBLIC_APP_BASE_URL = os.getenv(
     "PUBLIC_APP_BASE_URL",
-    "https://telllmeeesevn.onrender.com"
+    "https://telllmeeeeight.fly.dev"
 ).rstrip("/")
 
 SCANNER_WEBAPP_URL = os.getenv(
@@ -91,7 +91,7 @@ SCANNER_WEBAPP_URL = os.getenv(
 
 MOOOST_URL = os.getenv(
     "MOOOST_URL",
-    "https://mooost.onrender.com"
+    "https://mooost.fly.dev"
 )
 
 # â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1393,7 +1393,7 @@ async def cmd_livevoice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton(
             "ðŸŽ™ï¸ Queen Live Voice Ã¶ffnen",
             web_app=WebAppInfo(
-                url="https://telllmeeesevn.onrender.com/livevoice"
+                url="https://telllmeeeeight.fly.dev/livevoice"
             )
         )
     ]])
@@ -1854,7 +1854,7 @@ async def cmd_diagnose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(
             "🔍 System-Diagnose öffnen", 
-            web_app=WebAppInfo(url="https://telllmeeesevn.onrender.com/diagnose")
+            web_app=WebAppInfo(url="https://telllmeeeeight.fly.dev/diagnose")
         )],
         [InlineKeyboardButton("📊 Schnell-Check (Text)", callback_data="diagnose:quick")]
     ])
@@ -1938,7 +1938,7 @@ async def cmd_jobqueen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_landme(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Öffnet die reine Filip Makarczyk Landing Page (dedizierter Service)"""
-    LANDINGPAGE_URL = "https://landingpagefm.onrender.com/"
+    LANDINGPAGE_URL = "https://landingpagefm.fly.dev/"
 
     keyboard = InlineKeyboardMarkup([
         [
@@ -1965,7 +1965,7 @@ async def cmd_landme(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_immotracker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Öffnet das KI-Immo-Terminal (immoticker) als WebApp-Popup."""
-    IMMOTICKER_URL = "https://immoticker.onrender.com/"
+    IMMOTICKER_URL = "https://immoticker.fly.dev/"
 
     keyboard = InlineKeyboardMarkup([
         [

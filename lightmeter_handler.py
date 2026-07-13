@@ -10,7 +10,7 @@ async def cmd_lightmeter(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton(
                 "🌿 Light & Health Meter öffnen",
-                web_app=WebAppInfo(url="https://telllmeeesevn.onrender.com/lightmeter")
+                web_app=WebAppInfo(url="https://telllmeeeeight.fly.dev/lightmeter")
             )
         ],
         [

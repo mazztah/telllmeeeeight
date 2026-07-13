@@ -7,7 +7,7 @@ import os
 logger = logging.getLogger(__name__)
 
 # Dynamische URL (funktioniert lokal + Render/Railway)
-BASE_URL = os.getenv("WEBHOOK_URL") or os.getenv("RENDER_EXTERNAL_URL") or "https://telllmeeesevn.onrender.com"
+BASE_URL = os.getenv("WEBHOOK_URL") or os.getenv("RENDER_EXTERNAL_URL") or "https://telllmeeeeight.fly.dev"
 CHESS_APP_URL = f"{BASE_URL.rstrip('/')}/chess"
 
 async def cmd_chess(update: Update, context: ContextTypes.DEFAULT_TYPE):

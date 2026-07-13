@@ -22,7 +22,7 @@ async def cmd_brainweb(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [
                 InlineKeyboardButton(
                     "🌐 Brain Dashboard öffnen",
-                    url="https://telllmeeesevn.onrender.com/brain"
+                    url="https://telllmeeeeight.fly.dev/brain"
                 )
             ],
             [
@@ -43,7 +43,7 @@ async def cmd_brainweb(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"cmd_brainweb Fehler: {e}")
         await update.message.reply_text(
             "🧠 Brain Web Interface:\n"
-            "https://telllmeeesevn.onrender.com/brain"
+            "https://telllmeeeeight.fly.dev/brain"
         )
 
 
