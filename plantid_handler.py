@@ -17,7 +17,7 @@ _plantid_sessions: set = set()
 
 def _get_webapp_url() -> str:
     """Ermittelt die öffentliche URL der Plant-ID Mini-App."""
-    return os.getenv("PUBLIC_APP_BASE_URL", "https://telllmeeesevn.onrender.com").rstrip("/") + "/plantid"
+    return os.getenv("PUBLIC_APP_BASE_URL", "https://telllmeeeeight.fly.dev").rstrip("/") + "/plantid"
 
 
 def _format_result(data: dict) -> str:
