@@ -308,7 +308,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "<b>Willkommen beim Multitool-Bot</b>\n"
         "Ich merke mir den Chat, speichere Dateien ins Brain und starte AI-Workflows direkt im Chat.\n\n"
         "<b>??? Voice Cloning &amp; Verzerrung</b>\n"
-        "? <code>/voiceclone Name</code> -> Stimme klonen (Voice/Audio reply)\n"
+        "? <code>/voiceclone Name</code> -> Stimme klonen ya (Voice/Audio reply)\n"
         "? <code>/speak Name | Text</code> -> mit geklonter Stimme sprechen\n"
         "? <code>/myvoices</code> -> deine Stimmen\n"
         "? <code>/startstream</code> -> Live Voice Stream\n\n"
