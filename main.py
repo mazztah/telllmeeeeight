@@ -211,7 +211,7 @@ try:
         cmd_startstream, cmd_endstream, cmd_livevoice, cmd_scanner, cmd_shellgame,
         handle_ttv26, cmd_lyria, cmd_suno, cmd_freebeat, cmd_convert3d, cmd_text_to_3d,
         cmd_readme, cmd_diagnose, cmd_savecode, cmd_jobqueen, cmd_mooost, cmd_landme,
-        cmd_immotracker,
+        cmd_immotracker, cmd_pianosearch,
     )
 except ImportError as e:
     logger.warning(f"handlers_cmd nicht verfuegbar: {e}")
@@ -287,6 +287,7 @@ except ImportError as e:
     def cmd_mooost(*args, **kwargs): pass
     def cmd_landme(*args, **kwargs): pass
     def cmd_immotracker(*args, **kwargs): pass
+    def cmd_pianosearch(*args, **kwargs): pass
 
 try:
     from trichome_handler import cmd_trichome
@@ -626,6 +627,7 @@ if application:
     application.add_handler(CommandHandler("mooost", cmd_mooost)) 
     application.add_handler(CommandHandler("landme", cmd_landme))
     application.add_handler(CommandHandler("immotracker", cmd_immotracker))
+    application.add_handler(CommandHandler("pianosearch", cmd_pianosearch))
 
     # === NEU: Sendcode Handler (mit PDF, ZIP, Einzeldateien) ===
     from send_code_handler import cmd_send_code, sendcode_callback

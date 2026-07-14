@@ -1991,6 +1991,35 @@ async def cmd_immotracker(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def cmd_pianosearch(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Öffnet Weltklasse Pianistinnen (pianosearch) als WebApp-Popup."""
+    PIANOSEARCH_URL = "https://pianosearch.fly.dev/"
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "🎹 Weltklasse Pianistinnen öffnen",
+                web_app=WebAppInfo(url=PIANOSEARCH_URL)
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔗 Im Browser öffnen",
+                url=PIANOSEARCH_URL
+            )
+        ]
+    ])
+
+    await update.message.reply_text(
+        "🎹 <b>Weltklasse Pianistinnen</b>\n\n"
+        "40 kuratierte Porträts in drei Listen (Alltime Icons, junge Newcomerinnen, "
+        "aktuell 07/2026), live geladene Bilder &amp; YouTube-Videos, inkl. "
+        "kontextbewusstem KI-Chat.",
+        reply_markup=keyboard,
+        parse_mode="HTML",
+    )
+
+
 # ====================== SAVE CODE COMMAND ======================
 async def cmd_savecode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
