@@ -1995,6 +1995,34 @@ async def cmd_pianosearch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Öffnet Weltklasse Pianistinnen (pianosearch) als WebApp-Popup."""
     PIANOSEARCH_URL = "https://pianosearch.fly.dev/"
 
+
+async def cmd_bkabr(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Öffnet bkabr als WebApp-Popup."""
+    BKABR_URL = "https://bkabr.fly.dev/"
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "🧩 bkabr öffnen",
+                web_app=WebAppInfo(url=BKABR_URL),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔗 Im Browser öffnen",
+                url=BKABR_URL,
+            )
+        ]
+    ])
+
+    await update.message.reply_text(
+        "🧩 <b>bkabr</b>\n\n"
+        "Super-Quick-Link (Fly App).",
+        reply_markup=keyboard,
+        parse_mode="HTML",
+    )
+
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
