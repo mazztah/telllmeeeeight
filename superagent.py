@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from typing import Dict
@@ -10,6 +11,9 @@ from bot_state import client as groq_client
 from brain import load_all_entries
 
 logger = logging.getLogger(__name__)
+
+# ── Laufende SuperAgent-Tasks pro Chat, damit /superagentstop sie abbrechen kann ──
+_active_superagent_tasks: Dict[str, asyncio.Task] = {}
 
 SUPER_SYSTEM = """
 Du bist SuperAgent – Master aller Bot-Modules.
@@ -41,7 +45,7 @@ async def superagent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     3. Brain delete old voices
     """
     chat_id = str(update.effective_chat.id)
-    task = ' '.join(context.args).strip()
+    task_text = ' '.join(context.args).strip()
     
     keyboard = [
         [InlineKeyboardButton("Code MD", callback_data="super:code")],
@@ -51,7 +55,7 @@ async def superagent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         [InlineKeyboardButton("Save Code", callback_data="super:savecode")]
     ]
     
-    if not task:
+    if not task_text:
         if context.args and context.args[0].lower() == 'list':
             tools = build_agent_tools(chat_id)
             tool_list = "\\n".join(f"• **{t.name}**: {t.description[:80]}" for t in tools)
@@ -67,24 +71,54 @@ async def superagent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
     
-    loading = await update.message.reply_text("SuperAgent active...")
-    
+    if chat_id in _active_superagent_tasks and not _active_superagent_tasks[chat_id].done():
+        await update.message.reply_text(
+            "⚠️ Es läuft bereits ein SuperAgent-Task in diesem Chat. Erst /superagentstop, dann neu starten."
+        )
+        return
+
+    loading = await update.message.reply_text("SuperAgent active... (/superagentstop zum Abbrechen)")
+
     try:
         history = await build_prompt_history(chat_id)
         tools = build_agent_tools(chat_id)
         logger.info(f"SuperAgent tools available: {len(tools)} tools, history length: {len(history)}")
-        result = await run_agent_loop(
-            client=groq_client,
-            history=history,
-            user_message=task,
-            tools=tools,
-            max_steps=12
+
+        agent_task = asyncio.create_task(
+            run_agent_loop(
+                client=groq_client,
+                history=history,
+                user_message=task_text,
+                tools=tools,
+                max_steps=6,
+            )
         )
+        _active_superagent_tasks[chat_id] = agent_task
+        try:
+            result = await agent_task
+        finally:
+            _active_superagent_tasks.pop(chat_id, None)
+
         await context.bot.delete_message(chat_id, loading.message_id)
         await context.bot.send_message(chat_id, result['content'])
+    except asyncio.CancelledError:
+        await context.bot.edit_message_text(
+            chat_id=chat_id, message_id=loading.message_id, text="🛑 SuperAgent abgebrochen."
+        )
     except Exception as e:
         logger.error(str(e))
-        await context.bot.edit_message_text(chat_id, loading.message_id, str(e)[:200])
+        await context.bot.edit_message_text(chat_id=chat_id, message_id=loading.message_id, text=str(e)[:200])
+
+
+async def superagent_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/superagentstop – bricht einen laufenden SuperAgent-Task für diesen Chat ab."""
+    chat_id = str(update.effective_chat.id)
+    agent_task = _active_superagent_tasks.get(chat_id)
+    if not agent_task or agent_task.done():
+        await update.message.reply_text("Kein laufender SuperAgent-Task in diesem Chat.")
+        return
+    agent_task.cancel()
+    await update.message.reply_text("🛑 SuperAgent wird abgebrochen...")
 
 async def superagent_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
