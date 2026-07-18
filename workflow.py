@@ -11,6 +11,8 @@ from social import build_social_pack
 logger = logging.getLogger(__name__)
 
 DEFAULT_WORKFLOW_MODELS = [
+    "groq/compound",
+    "qwen/qwen3.6-27b",
     "meta-llama/llama-4-scout-17b-16e-instruct",
     "llama3-70b-8192",
     "codex/gpt-5.2",
@@ -126,7 +128,7 @@ async def create_workflow_bundle(
     client,
     history: list[dict[str, Any]],
     request_text: str,
-    model: str = "compound-mini",
+    model: str = "groq/compound",
 ) -> dict[str, Any]:
     messages = _workflow_messages(history, request_text)
     raw_text = ""

@@ -9,8 +9,9 @@ from search import web_search, format_search_results_for_prompt
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "llama3-70b-8192"
-FALLBACK_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+DEFAULT_MODEL = "groq/compound"
+FALLBACK_MODEL = "qwen/qwen3.6-27b"
+FALLBACK_MODEL_2 = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 
 async def fetch_care_tips_from_web(plant_name: str) -> dict:
@@ -86,7 +87,19 @@ async def fetch_care_tips_from_web(plant_name: str) -> dict:
             return {"success": True, "markdown": markdown, "plant_name": plant_name}
         except Exception as e2:
             logger.error("Fallback-LLM-Fehler: %s", e2)
-            return {"success": False, "error": f"KI-Aufbereitung fehlgeschlagen: {e2}"}
+            try:
+                completion = groq_client.chat.completions.create(
+                    model=FALLBACK_MODEL_2,
+                    messages=messages,
+                    temperature=0.4,
+                    max_tokens=1500,
+                    top_p=0.9,
+                )
+                markdown = completion.choices[0].message.content.strip()
+                return {"success": True, "markdown": markdown, "plant_name": plant_name}
+            except Exception as e3:
+                logger.error("Zweiter Fallback-LLM-Fehler: %s", e3)
+                return {"success": False, "error": f"KI-Aufbereitung fehlgeschlagen: {e3}"}
 
 
 async def chat_with_plant_agent(
@@ -178,5 +191,17 @@ async def chat_with_plant_agent(
             return {"success": True, "reply": reply}
         except Exception as e2:
             logger.error("Fallback Chat-Fehler: %s", e2)
-            return {"success": False, "error": f"Chat-Antwort fehlgeschlagen: {e2}"}
+            try:
+                completion = groq_client.chat.completions.create(
+                    model=FALLBACK_MODEL_2,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=1200,
+                    top_p=0.9,
+                )
+                reply = completion.choices[0].message.content.strip()
+                return {"success": True, "reply": reply}
+            except Exception as e3:
+                logger.error("Zweiter Fallback Chat-Fehler: %s", e3)
+                return {"success": False, "error": f"Chat-Antwort fehlgeschlagen: {e3}"}
 

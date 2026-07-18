@@ -8,6 +8,8 @@ from groq import Groq
 logger = logging.getLogger(__name__)
 
 VISION_MODELS = [
+    "groq/compound",
+    "qwen/qwen3.6-27b",
     os.getenv("VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct"),
     "llama-3.2-90b-vision-preview",
 ]
