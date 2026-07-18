@@ -369,11 +369,12 @@ except ImportError as e:
     def lightmeter_callback(*args, **kwargs): pass
 
 try:
-    from superagent import superagent_handler, superagent_callback
+    from superagent import superagent_handler, superagent_callback, superagent_stop_handler
 except ImportError as e:
     logger.warning(f"superagent nicht verfuegbar: {e}")
     def superagent_handler(*args, **kwargs): pass
     def superagent_callback(*args, **kwargs): pass
+    def superagent_stop_handler(*args, **kwargs): pass
 
 try:
     from openclaw import openclaw_handler, openclaw_callback
@@ -582,6 +583,7 @@ if application:
     application.add_handler(CommandHandler("suno", cmd_suno))
     application.add_handler(CommandHandler("freebeat", cmd_freebeat))
     application.add_handler(CommandHandler("superagent", superagent_handler))
+    application.add_handler(CommandHandler("superagentstop", superagent_stop_handler))
     application.add_handler(CommandHandler("openclaw", openclaw_handler))
     application.add_handler(CommandHandler("occ", openclaw_cloud_handler))
     application.add_handler(CommandHandler("cloud", openclaw_cloud_handler))
