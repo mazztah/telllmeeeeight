@@ -214,7 +214,8 @@ async def generate_response(chat_id: str, message: str) -> str:
     history.append({"role": "user", "content": message})
 
     model_list = [
-        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "groq/compound",
+        "qwen/qwen3.6-27b",
         "llama3-70b-8192",
         "codex/gpt-5.2",
     ]
@@ -261,7 +262,8 @@ async def generate_structured_json(system_prompt: str, user_message: str) -> str
     ]
 
     model_list = [
-        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "groq/compound",
+        "qwen/qwen3.6-27b",
         "llama3-70b-8192",
     ]
 
@@ -302,7 +304,8 @@ async def generate_structured_json_stream(system_prompt: str, user_message: str)
         {"role": "user", "content": user_message},
     ]
     model_list = [
-        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "groq/compound",
+        "qwen/qwen3.6-27b",
         "llama3-70b-8192",
     ]
     full_reply = ""
@@ -352,7 +355,8 @@ async def generate_response_stream(chat_id: str, message: str):
     history.append({"role": "user", "content": message})
 
     model_list = [
-        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "groq/compound",
+        "qwen/qwen3.6-27b",
         "llama3-70b-8192",
         "codex/gpt-5.2",
     ]
