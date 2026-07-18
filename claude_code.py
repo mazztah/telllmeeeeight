@@ -4,10 +4,9 @@ import os
 import json
 import asyncio
 from pydantic import BaseModel, Field
-from anthropic import Anthropic
 from telegram import Update
 from telegram.ext import ContextTypes
-from bot_state import last_generated_code
+from bot_state import last_generated_code, client as groq_client
 from bot_utils import create_download_buffer
 import logging
 
@@ -18,7 +17,8 @@ class CodeResult(BaseModel):
     language: str = Field(default="python")
     explanation: str = Field(...)
 
-client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+CODE_MODEL = "groq/compound"
+CODE_MODEL_FALLBACK = "llama3-70b-8192"
 
 async def handle_claude_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -41,7 +41,7 @@ async def handle_claude_code(update: Update, context: ContextTypes.DEFAULT_TYPE)
             prompt = text[len(cmd):].strip()
             break
     
-    loading = await update.message.reply_text('🧠 Claude 3.5 Sonnet coding... (Full agent mode)')
+    loading = await update.message.reply_text('🧠 groq/compound coding... (Full agent mode)')
     
     existing_code = None
     if update.message.reply_to_message:
@@ -52,16 +52,29 @@ async def handle_claude_code(update: Update, context: ContextTypes.DEFAULT_TYPE)
         
         existing_part = f"Existing: {existing_code}\n" if existing_code else ""
         msg = f"Prompt: {prompt}\n{existing_part}"
-        
-        resp = await asyncio.to_thread(
-            client.messages.create,
-            model='claude-3-5-sonnet-20240620',
-            max_tokens=4000,
-            system=system,
-            messages=[{'role': 'user', 'content': msg}]
-        )
-        
-        content = resp.content[0].text
+
+        messages = [
+            {'role': 'system', 'content': system},
+            {'role': 'user', 'content': msg},
+        ]
+
+        try:
+            resp = await asyncio.to_thread(
+                groq_client.chat.completions.create,
+                model=CODE_MODEL,
+                max_tokens=4000,
+                messages=messages,
+            )
+        except Exception as exc:
+            logger.warning('Code-Agent Modell %s fehlgeschlagen: %s', CODE_MODEL, exc)
+            resp = await asyncio.to_thread(
+                groq_client.chat.completions.create,
+                model=CODE_MODEL_FALLBACK,
+                max_tokens=4000,
+                messages=messages,
+            )
+
+        content = resp.choices[0].message.content
         # Pydantic parse
         json_match = json.loads(content[content.find('{'):content.rfind('}')+1])
         result = CodeResult(**json_match)
