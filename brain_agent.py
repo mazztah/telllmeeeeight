@@ -9,9 +9,8 @@ from brain import load_all_entries
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "groq/compound"
-FALLBACK_MODEL = "llama3-70b-8192"
-FALLBACK_MODEL_2 = "meta-llama/llama-4-scout-17b-16e-instruct"
+DEFAULT_MODEL = "llama3-70b-8192"
+FALLBACK_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 
 async def brain_query_agent(chat_id: str, query: str, top_k: int = 8) -> dict:
@@ -51,7 +50,7 @@ Strukturiere deine Antwort bei längeren Themen gerne mit Aufzählungen oder Abs
             {"role": "user", "content": f"Brain-Kontext:\n{context}\n\nFrage: {query}"}
         ]
 
-        # 3. LLM-Aufruf (mit zweistufigem Fallback)
+        # 3. LLM-Aufruf
         try:
             completion = groq_client.chat.completions.create(
                 model=DEFAULT_MODEL,
@@ -60,25 +59,14 @@ Strukturiere deine Antwort bei längeren Themen gerne mit Aufzählungen oder Abs
                 max_tokens=1600,
                 top_p=0.95,
             )
-        except Exception as exc:
-            logger.warning("Brain-Agent Modell %s fehlgeschlagen: %s", DEFAULT_MODEL, exc)
-            try:
-                completion = groq_client.chat.completions.create(
-                    model=FALLBACK_MODEL,
-                    messages=messages,
-                    temperature=0.65,
-                    max_tokens=1600,
-                    top_p=0.95,
-                )
-            except Exception as exc2:
-                logger.warning("Brain-Agent Modell %s fehlgeschlagen: %s", FALLBACK_MODEL, exc2)
-                completion = groq_client.chat.completions.create(
-                    model=FALLBACK_MODEL_2,
-                    messages=messages,
-                    temperature=0.65,
-                    max_tokens=1600,
-                    top_p=0.95,
-                )
+        except Exception:
+            completion = groq_client.chat.completions.create(
+                model=FALLBACK_MODEL,
+                messages=messages,
+                temperature=0.65,
+                max_tokens=1600,
+                top_p=0.95,
+            )
 
         answer = completion.choices[0].message.content.strip()
 
