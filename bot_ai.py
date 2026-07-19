@@ -15,6 +15,22 @@ from bot_state import (
 from brain import load_all_entries, load_entry
 from guard import is_privacy_mode_enabled
 
+# NEU: kompilierte Wiki-Schicht statt automatischem Voll-Brain-Dump
+# bei jeder Chatnachricht (siehe build_prompt_history unten).
+from wiki_compiler import load_wiki_for_prompt
+
+# NEU: optionaler Redis-Layer fuer Chat-History-Persistenz (ueberlebt
+# Redeploys). Bewusst fehlertolerant importiert - falls redis_state.py
+# fehlt oder kein REDIS_URL gesetzt ist, degradiert alles automatisch
+# auf den bisherigen reinen In-Memory-Betrieb (chat_histories dict).
+try:
+    from redis_state import get_json as _redis_get_json, set_json as _redis_set_json, is_persistent as _redis_is_persistent
+    _REDIS_AVAILABLE = True
+except Exception:
+    _REDIS_AVAILABLE = False
+
+from bot_utils import create_background_task
+
 logger = logging.getLogger(__name__)
 
 
@@ -141,27 +157,97 @@ def get_chat_history(chat_id: str):
     return _ensure_chat_history(chat_id).copy()
 
 
+async def hydrate_chat_histories_from_redis() -> int:
+    """
+    NEU: Best-effort Wiederherstellung von chat_histories aus Redis nach
+    einem Redeploy/Neustart. Bewusst NICHT im Hot-Path (get_chat_history
+    bleibt synchron und unveraendert), sondern einmalig beim Bot-Start
+    aus main.py aufgerufen: `await hydrate_chat_histories_from_redis()`.
+    Gibt die Anzahl wiederhergestellter Chats zurueck.
+    """
+    if not _REDIS_AVAILABLE or not _redis_is_persistent():
+        return 0
+    chat_ids = await _redis_get_json("chat_history_index", [])
+    restored = 0
+    for chat_id in chat_ids:
+        history = await _redis_get_json(f"chat_history:{chat_id}", None)
+        if history:
+            chat_histories[chat_id] = history
+            restored += 1
+    if restored:
+        logger.info("Chat-Historien aus Redis wiederhergestellt: %d Chats", restored)
+    return restored
+
+
+def _mirror_chat_history_to_redis(chat_id: str, history: list) -> None:
+    """Nicht-blockierendes Write-Through nach Redis. Fehler werden
+    verschluckt - Redis ist hier reine Persistenz-Zusatzschicht, kein
+    Hard-Dependency fuer den Chat-Betrieb."""
+    if not _REDIS_AVAILABLE or not _redis_is_persistent():
+        return
+
+    async def _job():
+        try:
+            await _redis_set_json(f"chat_history:{chat_id}", history)
+            index = await _redis_get_json("chat_history_index", [])
+            if chat_id not in index:
+                index.append(chat_id)
+                await _redis_set_json("chat_history_index", index, ttl=None)
+        except Exception as exc:
+            logger.debug("Redis-Mirror fuer Chat-History fehlgeschlagen (%s): %s", chat_id, exc)
+
+    try:
+        create_background_task(_job())
+    except Exception:
+        pass  # kein laufender Event-Loop o.ae. - einfach ueberspringen
+
+
 async def build_prompt_history(chat_id: str):
+    """
+    GEPATCHT: Vorher wurden bei aktivem full_brain_synced UND bei jedem
+    einzelnen synced_brain-Eintrag UND zusaetzlich noch unconditionally
+    (fuer JEDEN Chat, auch ohne Sync) der komplette Code-Brain-Kontext
+    (bis 4000 Zeichen) automatisch geladen und in JEDE Chatnachricht
+    injiziert - das war der Haupttreiber fuer unnoetige SQLite-Scans,
+    aufgeblaehte Prompts (= hoehere Groq-Tokenkosten) und im Kombi-Fall
+    mit /savecode (bis zu 3 MB Code-Dump) potenziell sehr teure
+    Prompt-Kontexte.
+
+    Neu: die einzige automatisch geladene Wissensquelle ist das
+    kompilierte Wiki (klein, Redis-gecacht, siehe wiki_compiler.py) -
+    und auch nur, wenn full_brain_synced oder synced_brain aktiv ist.
+    Fuer alles darueber hinaus (voller Brain-Inhalt, aktueller
+    Code-Kontext) muss der Agent aktiv ein Tool aufrufen
+    (semantic_brain_search / search_code_brain in bot_utils.py) statt
+    dass es jeder Nachricht automatisch angehaengt wird.
+    """
     history = get_chat_history(chat_id)
 
-    if full_brain_synced.get(chat_id, False):
-        entries = await load_all_entries(chat_id)
-        brain_text = "\n".join(
-            f"[BRAIN FILE {entry.get('id')}] {entry.get('title')}\n"
-            f"Vorschau: {_normalize_metadata(entry.get('metadata')).get('extracted_preview', '')[:800]}"
-            for entry in entries[:15]
-        )
-        if brain_text:
-            history.append({"role": "system", "content": f"DEIN GESAMTES BRAIN (100% synchronisiert):\n{brain_text}"})
+    brain_sync_active = full_brain_synced.get(chat_id, False) or bool(synced_brain.get(chat_id))
+    if brain_sync_active:
+        wiki_context = await load_wiki_for_prompt(chat_id, token_budget=6000)
+        if wiki_context:
+            history.append({
+                "role": "system",
+                "content": (
+                    "[WIKI - kompiliertes Brain-Wissen. Fuer Details ausserhalb "
+                    "dieser Zusammenfassung nutze das semantic_brain_search- oder "
+                    "search_code_brain-Tool.]\n" + wiki_context
+                ),
+            })
 
+    # Gezielt gepinnte Einzeldateien (/synchdata) bleiben klein und
+    # explizit vom User gewuenscht - die behalten wir bei, aber gedeckelt
+    # auf eine sinnvolle Groesse statt unbegrenzt zu wachsen.
     if chat_id in synced_brain and synced_brain[chat_id]:
-        for entry_id in synced_brain[chat_id]:
+        for entry_id in synced_brain[chat_id][:5]:
             entry = await load_entry(chat_id, entry_id)
             if entry:
                 metadata = _normalize_metadata(entry.get("metadata"))
+                preview = (metadata.get("extracted_preview", "") or "")[:600]
                 history.append({
                     "role": "system",
-                    "content": f"[SYNCHRONISIERTE DATEI {entry_id}] {entry.get('title')}\n{metadata.get('extracted_preview', '')}",
+                    "content": f"[SYNCHRONISIERTE DATEI {entry_id}] {entry.get('title')}\n{preview}",
                 })
 
     if chat_id in last_generated_code:
@@ -177,21 +263,9 @@ async def build_prompt_history(chat_id: str):
             ),
         })
 
-    # Code-Brain Einträge automatisch laden (für 24/7 Code-Zugriff)
-    try:
-        from codebrain import get_code_context_for_prompt
-        code_context = await get_code_context_for_prompt(chat_id, query=None, max_chars=4000)
-        if code_context:
-            history.append({
-                "role": "system",
-                "content": (
-                    f"[AKTUELLER BOT-CODE AUS DEM BRAIN]\n"
-                    f"{code_context}\n\n"
-                    f"Wenn der User nach Code fragt, verwende diesen Kontext."
-                ),
-            })
-    except Exception:
-        pass  # Code-Brain ist optional
+    # ENTFERNT: der unconditionale get_code_context_for_prompt-Block, der
+    # vorher bei JEDER Nachricht lief. Codekontext gibt es jetzt nur noch
+    # gezielt ueber das search_code_brain-Agent-Tool (bot_utils.py).
 
     if len(history) > MAX_CHAT_MESSAGES:
         history = [history[0]] + history[-(MAX_CHAT_MESSAGES - 1):]
@@ -207,6 +281,8 @@ def _persist_chat_turn(chat_id: str, user_message: str, assistant_message: str):
     if len(history) > MAX_CHAT_MESSAGES:
         history = [history[0]] + history[-(MAX_CHAT_MESSAGES - 1):]
     chat_histories[chat_id] = history
+    # NEU: nicht-blockierendes Redis-Mirroring (siehe hydrate_chat_histories_from_redis)
+    _mirror_chat_history_to_redis(chat_id, history)
 
 
 async def generate_response(chat_id: str, message: str) -> str:

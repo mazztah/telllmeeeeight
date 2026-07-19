@@ -25,6 +25,7 @@ from bot_state import (
 from bot_ai import generate_response, generate_voice, strip_voice_tags
 from bot_utils import fit_telegram_text
 from guard import can_process_text
+from save_router import looks_like_save_intent, save_from_replied_text, save_text_intent
 from imgedi import edit_image, format_edit_caption
 from search import format_search_results_for_user, web_search
 from ytscript import (
@@ -51,6 +52,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     decision = can_process_text(chat_id, text, action="chat")
     if not decision.allowed:
         await safe_send_message(context.bot, chat_id, decision.message)
+        return
+
+    # ── Save-Intent ────────────────────────────────────────────────────────────
+    # NEU: "speichere das" / "leg das ab" etc. Bewusst konservative
+    # Heuristik (looks_like_save_intent), um normale Chat-Saetze wie
+    # "wo speichere ich das eigentlich" nicht faelschlich zu triggern -
+    # siehe save_router.py fuer die genauen Muster.
+    if looks_like_save_intent(text):
+        if update.message.reply_to_message:
+            result = await save_from_replied_text(update, context)
+        else:
+            result = await save_text_intent(chat_id, text)
+        if result.get("success"):
+            await safe_send_message(context.bot, chat_id, f"✅ Gespeichert als '{result['filename']}'.")
+        else:
+            await safe_send_message(context.bot, chat_id, f"❌ Speichern fehlgeschlagen: {result.get('error') or result.get('message')}")
         return
 
     # ── Edit-Modus ─────────────────────────────────────────────────────────────

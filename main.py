@@ -29,7 +29,7 @@ import re as _re
 from contextlib import asynccontextmanager
 from typing import Optional, Dict, Any
 
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -872,6 +872,7 @@ async def init_webhook_mode():
 
         await application.start()
         logger.info("✅ Application gestartet")
+        _register_wiki_compile_job()
 
         # Webhook setzen (Timeout ist bei HF Spaces normal)
         await _set_webhook_safe()
@@ -938,6 +939,55 @@ async def _polling_inner():
             consecutive_errors = 0
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# WIKI-COMPILE-JOB (stuendlich) – kompiliert Brain-Rohdaten zu einem
+# kleinen, kompilierten Wiki (Karpathy/OKF-Pattern), damit
+# bot_ai.py:build_prompt_history() nicht mehr bei jeder Chatnachricht
+# das volle Brain aus der DB laden muss.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def _wiki_compile_tick(context=None) -> None:
+    try:
+        from redis_state import get_json
+        from wiki_compiler import run_periodic_compile
+
+        active_chats = await get_json("active_synced_chats", [])
+        if not active_chats:
+            return
+
+        logger.info(f"Wiki-Compile-Tick fuer {len(active_chats)} Chats")
+        for chat_id in active_chats:
+            try:
+                result = await run_periodic_compile(chat_id)
+                if not result.get("success"):
+                    logger.debug(f"Wiki-Compile uebersprungen fuer {chat_id}: {result.get('reason')}")
+            except Exception as exc:
+                logger.warning(f"Wiki-Compile fehlgeschlagen fuer {chat_id}: {exc}")
+    except Exception as exc:
+        logger.exception(f"Wiki-Compile-Tick Fehler: {exc}")
+
+
+def _register_wiki_compile_job() -> None:
+    """Registriert den stuendlichen Wiki-Compile-Job auf der bereits
+    gebauten Application (siehe bot_state.py). Sicher mehrfach aufrufbar
+    (Webhook- UND Polling-Pfad rufen das jeweils einmal auf)."""
+    try:
+        jq = getattr(application, "job_queue", None)
+        if jq is None:
+            logger.warning(
+                "job_queue nicht verfuegbar - Wiki-Compile-Job laeuft NICHT automatisch. "
+                "Fallback: /internal/wiki-compile-tick per externem Cron ansteuern."
+            )
+            return
+        existing = jq.get_jobs_by_name("wiki_compile_tick")
+        if existing:
+            return  # bereits registriert (z.B. Webhook + Polling beide aktiv)
+        jq.run_repeating(_wiki_compile_tick, interval=3600, first=120, name="wiki_compile_tick")
+        logger.info("✅ Wiki-Compile-Job registriert (stuendlich)")
+    except Exception as exc:
+        logger.warning(f"Wiki-Compile-Job Registrierung fehlgeschlagen: {exc}")
+
+
 async def polling_loop():
     """Haupt-Polling-Loop."""
     logger.info("Starte Bot (Polling-Mode)...")
@@ -947,6 +997,16 @@ async def polling_loop():
         await application.initialize()
         await application.start()
         logger.info("✅ Bot bereit für Polling")
+        _register_wiki_compile_job()
+
+        # NEU: Chat-Historien aus Redis wiederherstellen (falls konfiguriert),
+        # damit ein Redeploy nicht alle laufenden Konversationen killt.
+        try:
+            from bot_ai import hydrate_chat_histories_from_redis
+            await hydrate_chat_histories_from_redis()
+        except Exception as exc:
+            logger.warning(f"Chat-History-Hydration uebersprungen: {exc}")
+
         await _send_startup_greeting()
     except Exception as e:
         logger.error(f"Polling-Init fehlgeschlagen: {e}")
@@ -1289,6 +1349,23 @@ async def root():
 @app.get("/ping")
 async def ping():
     return {"status": "alive"}
+
+
+@app.post("/internal/wiki-compile-tick")
+async def wiki_compile_tick_endpoint(request: Request):
+    """
+    Fallback-Endpoint fuer den Wiki-Compile-Job, falls application.job_queue
+    nicht verfuegbar ist (z.B. python-telegram-bot ohne [job-queue] Extra).
+    Per externem Cron-Service (ihr nutzt eh schon cron-job.org fuer den
+    Keepalive-Ping laut POLLING_KEEPALIVE.md) stuendlich aufrufen:
+        POST https://deine-app.../internal/wiki-compile-tick
+        Header: X-Cron-Secret: <CRON_SECRET env var>
+    """
+    expected_secret = os.getenv("CRON_SECRET", "")
+    if not expected_secret or request.headers.get("X-Cron-Secret") != expected_secret:
+        raise HTTPException(status_code=403, detail="Ungueltiges oder fehlendes X-Cron-Secret")
+    await _wiki_compile_tick()
+    return {"status": "ok"}
 
 
 @app.get("/health")

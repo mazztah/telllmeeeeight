@@ -27,6 +27,7 @@ from vision import analyze_images
 from voicecl import clone_voice_from_file
 from voice_distortion import apply_effect
 from handler_convert3d import handle_3d_document
+from save_router import looks_like_save_intent, save_photo_intent
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,16 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from bot_state import vision_mode_active
     vision_state = vision_mode_active.pop(chat_id, None)
     if not vision_state:
+        # NEU: Fotos wurden bisher HIER stillschweigend verworfen, wenn
+        # weder Edit- noch Vision-Modus aktiv war. Jetzt: Save-Intent
+        # pruefen, bevor wir kommentarlos returnen.
+        caption = (update.message.caption or "").strip()
+        if looks_like_save_intent(caption):
+            result = await save_photo_intent(update, context)
+            if result.get("success"):
+                await update.message.reply_text(f"✅ Foto gespeichert: {result['filename']}.")
+            else:
+                await update.message.reply_text(f"❌ Speichern fehlgeschlagen: {result.get('message')}")
         return
 
     loading_msg = await update.message.reply_text("👀 Analysiere Bild...")

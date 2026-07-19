@@ -390,4 +390,14 @@ def build_agent_tools(chat_id: str) -> list[AgentTool]:
             parameters={"type": "object"},
             handler=tool_save_code_brain,
         ),
+        # NEU: generischer Save-Intent-Tool fuer Text/Code aus dem Chat
+        # (Datei-Uploads werden weiterhin automatisch in
+        # handlers_media.py:handle_document gespeichert, dieses Tool
+        # deckt reinen Chat-Text/Code ab, den der User "speichern" will).
+        _build_save_to_brain_tool(chat_id),
     ]
+
+
+def _build_save_to_brain_tool(chat_id: str) -> AgentTool:
+    from save_router import build_save_tool
+    return build_save_tool(chat_id)

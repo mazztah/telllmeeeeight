@@ -3,6 +3,17 @@ import time
 from collections import deque
 from dataclasses import dataclass
 
+# NEU: optionaler Redis-Layer fuer persistente Rate-Limits (ueberlebt
+# Redeploys). Fehlertolerant importiert - ohne redis_state.py oder ohne
+# REDIS_URL faellt alles automatisch auf die bisherige reine
+# In-Memory-Logik zurueck, kein Verhaltensbruch.
+try:
+    from redis_state import rate_limit_hit as _redis_rate_limit_hit
+    from redis_state import is_persistent as _redis_is_persistent
+    _REDIS_AVAILABLE = True
+except Exception:
+    _REDIS_AVAILABLE = False
+
 
 @dataclass
 class GuardDecision:
@@ -95,6 +106,38 @@ def check_rate_limit(chat_id: str, action: str = "chat", limit: int | None = Non
     return GuardDecision(True, "")
 
 
+async def check_rate_limit_async(
+    chat_id: str,
+    action: str = "chat",
+    limit: int | None = None,
+    window_seconds: int | None = None,
+) -> GuardDecision:
+    """
+    NEU: Redis-gestuetzte Variante fuer kritische Call-Sites (z.B.
+    /superagent, /mailbatch, /sandbox), wo Rate-Limits auch einen
+    Redeploy ueberleben sollen. Faellt automatisch auf die synchrone
+    In-Memory-Logik zurueck, wenn kein Redis konfiguriert ist.
+    """
+    if not chat_id:
+        return GuardDecision(True, "")
+    max_calls, window = _get_limit(action)
+    max_calls = limit or max_calls
+    window = window_seconds or window
+
+    if not _REDIS_AVAILABLE or not _redis_is_persistent():
+        return check_rate_limit(chat_id, action=action, limit=limit, window_seconds=window_seconds)
+
+    count = await _redis_rate_limit_hit(str(chat_id), action, window)
+    if count > max_calls:
+        return GuardDecision(
+            allowed=False,
+            message=f"Zu viele {action}-Anfragen gerade. Versuch es in {window}s nochmal.",
+            retry_after=window,
+            severity="rate_limit",
+        )
+    return GuardDecision(True, "")
+
+
 def moderate_text(text: str) -> GuardDecision:
     content = (text or "").strip()
     if not content:
@@ -154,8 +197,10 @@ def is_privacy_mode_enabled(chat_id: str) -> bool:
 
 def describe_guard_status(chat_id: str) -> str:
     privacy = "AN" if is_privacy_mode_enabled(chat_id) else "AUS"
+    backend = "Redis (persistent)" if (_REDIS_AVAILABLE and _redis_is_persistent()) else "In-Memory (nicht persistent)"
     return (
         "Guard-Status\n"
         f"Privacy-Mode: {privacy}\n"
+        f"Rate-Limit-Backend: {backend}\n"
         "Rate-Limits aktiv fuer Chat, Agent, Workflows, Bild, Video und Email-Batches."
     )

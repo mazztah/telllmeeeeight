@@ -409,18 +409,59 @@ async def cmd_synchromaster(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_synchroall(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    GEPATCHT: full_brain_synced ist jetzt nur noch ein Berechtigungs-Flag
+    ("dieser Chat darf Brain-Wissen im Kontext sehen") statt eines
+    Triggers, der bei JEDER Nachricht das komplette Brain aus der DB
+    laedt (siehe bot_ai.py:build_prompt_history). Stattdessen wird eine
+    kompilierte Wiki-Seite geladen (klein, Redis-gecacht) - fuer den
+    vollen Brain-Inhalt nutzt der Agent bei Bedarf das
+    semantic_brain_search-Tool.
+    """
     chat_id = str(update.effective_chat.id)
     full_brain_synced[chat_id] = True
-    await update.message.reply_text("ðŸ”„ Full-Brain-Sync aktiviert.")
+
+    # Chat als "aktiv" fuer den periodischen Wiki-Compile-Job registrieren
+    try:
+        from redis_state import get_json, set_json
+        active_chats = await get_json("active_synced_chats", [])
+        if chat_id not in active_chats:
+            active_chats.append(chat_id)
+            await set_json("active_synced_chats", active_chats, ttl=None)
+    except Exception as exc:
+        logger.debug("Redis-Registrierung fuer Wiki-Job uebersprungen: %s", exc)
+
+    # Einmalige sofortige Wiki-Kompilierung, damit der User nicht bis
+    # zum naechsten stuendlichen Tick warten muss.
+    try:
+        from wiki_compiler import run_periodic_compile
+        await run_periodic_compile(chat_id)
+    except Exception as exc:
+        logger.warning("Initiale Wiki-Kompilierung fehlgeschlagen: %s", exc)
+
+    await update.message.reply_text(
+        "Brain-Zugriff aktiviert. Ich lade jetzt NICHT mehr bei jeder "
+        "Nachricht alles neu - stattdessen nutze ich ein kompiliertes "
+        "Wiki und durchsuche das volle Brain nur gezielt bei Bedarf."
+    )
 
 
 async def cmd_synchdata(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = str(update.effective_chat.id)
     if not context.args:
-        await update.message.reply_text("âŒ /synchdata <ID>")
+        await update.message.reply_text("Nutzung: /synchdata <ID>")
         return
     synced_brain.setdefault(chat_id, []).append(context.args[0])
-    await update.message.reply_text(f"âœ… Datei ID `{context.args[0]}` dauerhaft synchronisiert.")
+
+    # NEU: zusaetzlich in Redis spiegeln, damit der Pin einen Redeploy
+    # ueberlebt (das In-Memory-Dict synced_brain tut das nicht).
+    try:
+        from redis_state import set_synced_brain_ids
+        await set_synced_brain_ids(chat_id, synced_brain[chat_id])
+    except Exception:
+        pass
+
+    await update.message.reply_text(f"Datei ID `{context.args[0]}` dauerhaft synchronisiert.")
 
 
 async def cmd_convert(update: Update, context: ContextTypes.DEFAULT_TYPE):
