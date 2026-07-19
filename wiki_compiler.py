@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -311,3 +312,175 @@ async def run_periodic_compile(chat_id: str, llm_client=None) -> dict[str, Any]:
     raw_sources = [{"title": e.get("title", ""), "content": e.get("content", "")} for e in batch]
     page = await compile_wiki_page(chat_id, "recent/summary", raw_sources, llm_client=llm_client)
     return {"success": True, "concept_id": page.concept_id, "updated_at": page.updated_at}
+
+
+# ── NEU: Status, Voll-Sync und Export (fuer /wikistatus, /wikisync, /wikiexport) ──
+
+async def get_wiki_status(chat_id: str) -> dict[str, Any]:
+    """
+    Liefert einen kompakten Statusbericht fuer /wikistatus:
+    Anzahl Seiten, Groesse, letztes Update, Redis-Backend aktiv?
+    """
+    from redis_state import is_persistent
+
+    pages = await load_all_wiki_pages(chat_id)
+    total_chars = sum(len(p.to_markdown()) for p in pages)
+    estimated_tokens = total_chars // CHARS_PER_TOKEN_ESTIMATE
+    latest_update = max((p.updated_at for p in pages), default="-")
+
+    return {
+        "chat_id": chat_id,
+        "page_count": len(pages),
+        "total_chars": total_chars,
+        "estimated_tokens": estimated_tokens,
+        "within_direct_read_budget": estimated_tokens <= DEFAULT_TOKEN_BUDGET,
+        "latest_update": latest_update,
+        "redis_backend_active": is_persistent(),
+        "pages": [
+            {"concept_id": p.concept_id, "title": p.title, "updated_at": p.updated_at, "tags": p.tags}
+            for p in sorted(pages, key=lambda x: x.updated_at, reverse=True)
+        ],
+    }
+
+
+def format_wiki_status(status: dict[str, Any]) -> str:
+    backend = "Redis (persistent)" if status["redis_backend_active"] else "In-Memory (nicht persistent)"
+    budget_state = "OK - passt komplett in den Prompt" if status["within_direct_read_budget"] else "ZU GROSS - nur Kurzuebersicht wird geladen"
+    lines = [
+        f"Wiki-Status fuer diesen Chat",
+        f"Seiten: {status['page_count']}",
+        f"Groesse: ~{status['total_chars']:,} Zeichen (~{status['estimated_tokens']:,} Tokens)",
+        f"Direct-Read-Budget (6000 Tokens): {budget_state}",
+        f"Letztes Update: {status['latest_update'] or '-'}",
+        f"Speicher-Backend: {backend}",
+        "",
+        "Seiten:",
+    ]
+    if not status["pages"]:
+        lines.append("(noch keine Seiten - /wikisync ausfuehren)")
+    for page in status["pages"][:20]:
+        tag_text = f" [{', '.join(page['tags'])}]" if page["tags"] else ""
+        lines.append(f"- {page['concept_id']} - {page['title']}{tag_text} (Update: {page['updated_at']})")
+    if len(status["pages"]) > 20:
+        lines.append(f"... und {len(status['pages']) - 20} weitere")
+    return "\n".join(lines)
+
+
+async def compile_documents_to_wiki(
+    chat_id: str,
+    limit: int = 50,
+    concurrency: int = 3,
+    llm_client=None,
+) -> dict[str, Any]:
+    """
+    Fuer /wikisync: kompiliert alle (bzw. die neuesten `limit`) im Brain
+    gespeicherten Dokumente/Uploads/Notizen JEWEILS in eine eigene
+    Wiki-Seite (statt nur einer einzigen 'recent/summary'-Sammelseite
+    wie run_periodic_compile()). Damit bekommt jedes hochgeladene
+    Dokument seine eigene, durchsuchbare, kompilierte Zusammenfassung.
+
+    Laeuft mit begrenzter Nebenlaeufigkeit (Default 3), um weder Groq
+    noch Supabase/SQLite mit zu vielen parallelen Kompilierungen zu
+    ueberlasten.
+    """
+    import asyncio
+    from brain import load_all_entries
+
+    entries = await load_all_entries(chat_id)
+    if not entries:
+        return {"success": False, "reason": "keine Brain-Eintraege gefunden", "compiled": 0}
+
+    entries = entries[:limit]
+    semaphore = asyncio.Semaphore(concurrency)
+    compiled_pages: list[str] = []
+    failed = 0
+
+    async def _compile_one(entry: dict[str, Any]) -> None:
+        nonlocal failed
+        async with semaphore:
+            entry_id = entry.get("id", "unknown")
+            raw_title = (entry.get("title") or f"entry-{entry_id}").strip()
+            # Concept-ID aus Titel ableiten (OKF-Pattern: sprechender Pfad statt UUID)
+            slug = re.sub(r"[^a-z0-9\-]+", "-", raw_title.lower()).strip("-")[:60] or str(entry_id)
+            concept_id = f"documents/{slug}"
+            try:
+                await compile_wiki_page(
+                    chat_id,
+                    concept_id,
+                    [{"title": raw_title, "content": entry.get("content", "")}],
+                    llm_client=llm_client,
+                )
+                compiled_pages.append(concept_id)
+            except Exception as exc:
+                logger.warning("Wiki-Sync fehlgeschlagen fuer Eintrag %s: %s", entry_id, exc)
+                failed += 1
+
+    await asyncio.gather(*(_compile_one(e) for e in entries))
+
+    return {
+        "success": True,
+        "compiled": len(compiled_pages),
+        "failed": failed,
+        "total_entries_considered": len(entries),
+        "concept_ids": compiled_pages,
+    }
+
+
+async def export_wiki_markdown_bundle(chat_id: str) -> str:
+    """Fuer /wikiexport: gesamten Wiki-Bestand als ein zusammenhaengendes
+    Markdown-Dokument (alle Seiten inkl. Frontmatter, durch Trenner
+    getrennt)."""
+    pages = await load_all_wiki_pages(chat_id)
+    if not pages:
+        return ""
+    header = (
+        f"# Wiki-Export\n"
+        f"Chat: {chat_id}\n"
+        f"Exportiert: {datetime.now(timezone.utc).isoformat()}\n"
+        f"Seiten: {len(pages)}\n\n"
+        f"---\n\n"
+    )
+    body = "\n\n---\n\n".join(p.to_markdown() for p in sorted(pages, key=lambda x: x.concept_id))
+    return header + body
+
+
+def create_wiki_pdf(markdown_bundle: str, title: str = "Wiki Export") -> "BytesIO":
+    """PDF-Export des Wiki-Bestands, gleiches Muster wie
+    send_code_handler.py:create_pdf_from_markdown - falls reportlab
+    fehlt, faellt es auf eine reine Textdatei zurueck statt zu crashen."""
+    from io import BytesIO
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+    except ImportError:
+        buffer = BytesIO(markdown_bundle.encode("utf-8"))
+        buffer.name = f"{title.replace(' ', '_')}.txt"
+        return buffer
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("Title", parent=styles["Heading1"], fontSize=18, spaceAfter=20, textColor=colors.darkblue)
+    concept_style = ParagraphStyle("Concept", parent=styles["Heading2"], fontSize=12, spaceAfter=4, textColor=colors.darkslategray)
+    body_style = ParagraphStyle("Body", parent=styles["Normal"], fontSize=9, spaceAfter=12, leading=13)
+
+    story = [Paragraph(title, title_style), Spacer(1, 12)]
+    for page_block in markdown_bundle.split("\n\n---\n\n"):
+        page_block = page_block.strip()
+        if not page_block:
+            continue
+        heading = page_block.splitlines()[0][:120] if page_block.splitlines() else "Seite"
+        safe_body = (
+            page_block.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        )[:6000]
+        story.append(Paragraph(heading, concept_style))
+        story.append(Paragraph(safe_body.replace("\n", "<br/>"), body_style))
+        story.append(Spacer(1, 10))
+
+    doc.build(story)
+    buffer.seek(0)
+    buffer.name = f"wiki_export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.pdf"
+    return buffer

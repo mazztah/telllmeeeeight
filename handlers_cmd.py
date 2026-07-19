@@ -2142,3 +2142,138 @@ async def cmd_savecode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     finally:
         if lock.locked():
             lock.release()
+
+
+# ====================== WIKI COMMANDS ======================
+
+async def cmd_wikisync(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /wikisync – Kompiliert ALLE (bzw. die neuesten 50) hochgeladenen
+    Dokumente/Notizen aus dem Brain in eigene, durchsuchbare
+    Wiki-Seiten. Laeuft normalerweise automatisch stuendlich im
+    Hintergrund (main.py:_wiki_compile_tick) - dieser Command triggert
+    es SOFORT, z.B. direkt nachdem du mehrere Dateien hochgeladen hast.
+    """
+    chat_id = str(update.effective_chat.id)
+    loading = await update.message.reply_text(
+        "🔄 Kompiliere hochgeladene Dokumente ins Wiki...\n"
+        "Das kann je nach Anzahl der Dokumente etwas dauern ⏳"
+    )
+    try:
+        from wiki_compiler import compile_documents_to_wiki
+
+        limit = 50
+        if context.args and context.args[0].isdigit():
+            limit = min(int(context.args[0]), 200)
+
+        result = await compile_documents_to_wiki(chat_id, limit=limit)
+
+        if not result.get("success"):
+            await safe_edit_message(
+                context.bot, chat_id=chat_id, message_id=loading.message_id,
+                text=f"❌ {result.get('reason', 'Kompilierung fehlgeschlagen.')}",
+            )
+            return
+
+        # Chat als "aktiv" registrieren, damit der stuendliche Job ihn
+        # ab jetzt auch automatisch mitnimmt
+        try:
+            from redis_state import get_json, set_json
+            active_chats = await get_json("active_synced_chats", [])
+            if chat_id not in active_chats:
+                active_chats.append(chat_id)
+                await set_json("active_synced_chats", active_chats, ttl=None)
+        except Exception:
+            pass
+
+        text = (
+            f"✅ Wiki-Sync abgeschlossen.\n"
+            f"Kompiliert: {result['compiled']} von {result['total_entries_considered']} Dokumenten\n"
+        )
+        if result.get("failed"):
+            text += f"⚠️ Fehlgeschlagen: {result['failed']}\n"
+        text += "\nNutze /wikistatus fuer eine Uebersicht aller Seiten."
+
+        await safe_edit_message(context.bot, chat_id=chat_id, message_id=loading.message_id, text=text)
+
+    except Exception as exc:
+        logger.exception("cmd_wikisync Fehler")
+        await safe_edit_message(
+            context.bot, chat_id=chat_id, message_id=loading.message_id,
+            text=f"❌ Fehler beim Wiki-Sync:\n{str(exc)[:250]}",
+        )
+
+
+async def cmd_wikistatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /wikistatus – Zeigt den aktuellen Zustand des kompilierten Wikis
+    fuer diesen Chat: Anzahl Seiten, Groesse, letztes Update, ob es
+    noch komplett in den Prompt passt (Direct-Read) oder schon zu gross
+    ist, und ob Redis als persistentes Backend aktiv ist.
+    """
+    chat_id = str(update.effective_chat.id)
+    try:
+        from wiki_compiler import get_wiki_status, format_wiki_status
+
+        status = await get_wiki_status(chat_id)
+        await update.message.reply_text(format_wiki_status(status))
+    except Exception as exc:
+        logger.exception("cmd_wikistatus Fehler")
+        await update.message.reply_text(f"❌ Fehler beim Laden des Wiki-Status:\n{str(exc)[:250]}")
+
+
+async def cmd_wikiexport(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /wikiexport – Laedt den kompletten Wiki-Bestand als Markdown-Datei
+    UND als PDF in den Chat, analog zu /sendcode (send_code_handler.py).
+    """
+    chat_id = str(update.effective_chat.id)
+    loading = await update.message.reply_text("📄 Exportiere Wiki-Bestand...")
+
+    try:
+        from wiki_compiler import export_wiki_markdown_bundle, create_wiki_pdf
+        from io import BytesIO
+        from datetime import datetime
+
+        markdown_bundle = await export_wiki_markdown_bundle(chat_id)
+
+        if not markdown_bundle:
+            await safe_edit_message(
+                context.bot, chat_id=chat_id, message_id=loading.message_id,
+                text="❌ Noch kein Wiki vorhanden. Nutze zuerst /wikisync oder /synchroall.",
+            )
+            return
+
+        await safe_edit_message(
+            context.bot, chat_id=chat_id, message_id=loading.message_id,
+            text="📄 Wiki kompiliert, sende Dateien...",
+        )
+
+        # Markdown senden
+        md_buffer = BytesIO(markdown_bundle.encode("utf-8"))
+        md_buffer.name = f"wiki_export_{datetime.now().strftime('%Y%m%d_%H%M')}.md"
+        await context.bot.send_document(
+            chat_id=chat_id,
+            document=md_buffer,
+            filename=md_buffer.name,
+            caption=f"📄 Wiki-Export (Markdown)\n~{len(markdown_bundle):,} Zeichen",
+        )
+
+        # PDF senden (faellt auf .txt zurueck, falls reportlab fehlt)
+        pdf_buffer = create_wiki_pdf(markdown_bundle, title=f"Wiki Export – Chat {chat_id}")
+        await context.bot.send_document(
+            chat_id=chat_id,
+            document=pdf_buffer,
+            filename=pdf_buffer.name,
+            caption="✅ Wiki-Export (PDF)",
+        )
+
+    except Exception as exc:
+        logger.exception("cmd_wikiexport Fehler")
+        try:
+            await safe_edit_message(
+                context.bot, chat_id=chat_id, message_id=loading.message_id,
+                text=f"❌ Fehler beim Wiki-Export:\n{str(exc)[:250]}",
+            )
+        except Exception:
+            await update.message.reply_text(f"❌ Fehler beim Wiki-Export:\n{str(exc)[:250]}")
