@@ -221,7 +221,15 @@ async def build_prompt_history(chat_id: str):
     (semantic_brain_search / search_code_brain in bot_utils.py) statt
     dass es jeder Nachricht automatisch angehaengt wird.
     """
+    from datetime import datetime
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    system_time_message = {"role": "system", "content": f"Aktuelles Datum und Uhrzeit: {current_datetime}."}
     history = get_chat_history(chat_id)
+    # Füge die Zeitinformation nach der initialen Systemnachricht, aber vor den Benutzer-/Assistentennachrichten ein
+    if len(history) > 0 and history[0]["role"] == "system":
+        history.insert(1, system_time_message)
+    else:
+        history.insert(0, system_time_message)
 
     brain_sync_active = full_brain_synced.get(chat_id, False) or bool(synced_brain.get(chat_id))
     if brain_sync_active:

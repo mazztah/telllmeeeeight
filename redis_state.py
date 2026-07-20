@@ -20,7 +20,7 @@ from typing import Any, Optional
 logger = logging.getLogger(__name__)
 
 REDIS_URL = os.getenv("REDIS_URL", "").strip()
-DEFAULT_TTL_SECONDS = int(os.getenv("REDIS_DEFAULT_TTL", str(60 * 60 * 24 * 14)))  # 14 Tage
+DEFAULT_TTL_SECONDS = int(os.getenv("REDIS_DEFAULT_TTL", str(60 * 60 * 24 * 365 * 10)))  # 10 Jahre für Persistenz
 
 # ── Backend-Auswahl ──────────────────────────────────────────────────────
 _redis_client = None

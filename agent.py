@@ -51,7 +51,10 @@ async def run_agent_loop(
     model_chain = [model] + [m for m in fallback_models if m != model]
 
     tool_map = {tool.name: tool for tool in tools}
-    messages = list(history)
+    from datetime import datetime
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    system_message = {"role": "system", "content": f"Aktuelles Datum und Uhrzeit: {current_datetime}."}
+    messages = [system_message] + list(history)
     messages.append({"role": "user", "content": user_message})
     used_tools: list[str] = []
 

@@ -193,7 +193,7 @@ async def compile_wiki_page(
     existing_body = existing.body if existing else "(neue Seite)"
 
     sources_text = "\n\n".join(
-        f"### Quelle: {src.get('title', 'unbenannt')}\n{src.get('content', '')[:1500]}"
+        f"### Quelle: {src.get(\'title\', \'unbenannt\')}\n{src.get(\'content\', \'\')}"
         for src in raw_sources
     )
 
@@ -475,7 +475,7 @@ def create_wiki_pdf(markdown_bundle: str, title: str = "Wiki Export") -> "BytesI
         heading = page_block.splitlines()[0][:120] if page_block.splitlines() else "Seite"
         safe_body = (
             page_block.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        )[:6000]
+        )
         story.append(Paragraph(heading, concept_style))
         story.append(Paragraph(safe_body.replace("\n", "<br/>"), body_style))
         story.append(Spacer(1, 10))
