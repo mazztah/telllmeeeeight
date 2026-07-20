@@ -211,7 +211,7 @@ try:
         cmd_startstream, cmd_endstream, cmd_livevoice, cmd_scanner, cmd_shellgame,
         handle_ttv26, cmd_lyria, cmd_suno, cmd_freebeat, cmd_convert3d, cmd_text_to_3d,
         cmd_readme, cmd_diagnose, cmd_savecode, cmd_jobqueen, cmd_mooost, cmd_landme,
-        cmd_immotracker, cmd_pianosearch, cmd_bkabr,
+        cmd_immotracker, cmd_pianosearch, cmd_bkabr, cmd_marketing,
         cmd_wikisync, cmd_wikistatus, cmd_wikiexport,
     )
 except ImportError as e:
@@ -638,6 +638,7 @@ if application:
     application.add_handler(CommandHandler("immotracker", cmd_immotracker))
     application.add_handler(CommandHandler("pianosearch", cmd_pianosearch))
     application.add_handler(CommandHandler("bkabr", cmd_bkabr))
+    application.add_handler(CommandHandler("marketing", cmd_marketing))
 
     # === NEU: Sendcode Handler (mit PDF, ZIP, Einzeldateien) ===
     from send_code_handler import cmd_send_code, sendcode_callback

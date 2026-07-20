@@ -2037,6 +2037,33 @@ async def cmd_pianosearch(update: Update, context: ContextTypes.DEFAULT_TYPE):
     PIANOSEARCH_URL = "https://pianosearch.fly.dev/"
 
 
+async def cmd_marketing(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Öffnet marketing als WebApp-Popup."""
+    MARKETING_URL = "https://bkabr.fly.dev/marketing"
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                "📈 marketing öffnen",
+                web_app=WebAppInfo(url=MARKETING_URL),
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                "🔗 Im Browser öffnen",
+                url=MARKETING_URL,
+            )
+        ]
+    ])
+
+    await update.message.reply_text(
+        "📈 <b>marketing</b>\n\n"
+        "Super-Quick-Link (Fly App).",
+        reply_markup=keyboard,
+        parse_mode="HTML",
+    )
+
+
 async def cmd_bkabr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Öffnet bkabr als WebApp-Popup."""
     BKABR_URL = "https://bkabr.fly.dev/"
