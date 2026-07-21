@@ -290,6 +290,23 @@
 
     <canvas id="gameCanvas"></canvas>
 
+    <div id="fatal-error" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+         max-width:80%; background:rgba(40,0,0,0.9); border:1px solid #ff3333; color:#ff8888;
+         padding:20px; border-radius:10px; font-size:13px; z-index:2000; text-align:center;">
+        ⚠️ Das Spiel konnte nicht geladen werden.<br>
+        <span id="fatal-error-detail" style="font-size:11px; opacity:0.8;"></span>
+    </div>
+    <script>
+        // Fängt Fehler ab, die außerhalb des try/catch im module-script passieren
+        // (z.B. wenn der Import von three.js selbst fehlschlägt, CDN blockiert etc.)
+        window.addEventListener('error', (e) => {
+            const box = document.getElementById('fatal-error');
+            if (!window.__shellGameStarted) {
+                box.style.display = 'block';
+                document.getElementById('fatal-error-detail').textContent = (e.message || 'Unbekannter Fehler') + ' — prüfe die Browser-Konsole (F12) für Details.';
+            }
+        });
+    </script>
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -298,9 +315,15 @@
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
         // ── Telegram WebApp Integration ──────────────────────────────────────
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        // Fallback, falls die Seite außerhalb von Telegram (z.B. direkt im
+        // Browser zum Testen) geöffnet wird - sonst bricht window.Telegram.WebApp
+        // sofort ab und GAR NICHTS im Script danach wird mehr ausgeführt
+        // (auch keine Event-Listener -> Buttons wirken "tot").
+        const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
+            expand() {}, ready() {}, initDataUnsafe: {}
+        };
+        try { tg.expand(); } catch (e) { console.warn('tg.expand() fehlgeschlagen:', e); }
+        try { tg.ready(); } catch (e) { console.warn('tg.ready() fehlgeschlagen:', e); }
 
         // ── Sound Engine (rein synthetisiert per WebAudio, keine Assets nötig) ─
         class SoundEngine {
@@ -937,9 +960,18 @@
             }
         }
 
-        window.game = new CyberShellGame();
+        try {
+            window.game = new CyberShellGame();
+            window.__shellGameStarted = true;
+        } catch (e) {
+            console.error('Shellgame Init fehlgeschlagen:', e);
+            const box = document.getElementById('fatal-error');
+            box.style.display = 'block';
+            document.getElementById('fatal-error-detail').textContent = (e.message || String(e)) + ' — prüfe die Browser-Konsole (F12) für Details.';
+        }
 
         window.addEventListener('resize', () => {
+            if (!window.game) return;
             window.game.camera.aspect = window.innerWidth / window.innerHeight;
             window.game.camera.updateProjectionMatrix();
             window.game.renderer.setSize(window.innerWidth, window.innerHeight);
