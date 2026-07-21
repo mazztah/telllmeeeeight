@@ -2249,6 +2249,62 @@ async def cmd_wikistatus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Fehler beim Laden des Wiki-Status:\n{str(exc)[:250]}")
 
 
+async def cmd_brainexport(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /brainexport – Voller, verlustfreier Export ALLER Original-Uploads
+    (nicht die LLM-komprimierte Wiki-Zusammenfassung, siehe /wikiexport).
+    Nutze das, wenn du deine Original-Datei(en) 1:1 zurueck willst.
+    """
+    chat_id = str(update.effective_chat.id)
+    loading = await update.message.reply_text("📦 Exportiere Original-Uploads (Brain, unkomprimiert)...")
+
+    try:
+        from wiki_compiler import export_brain_raw_bundle, create_wiki_pdf
+        from io import BytesIO
+        from datetime import datetime
+
+        bundle = await export_brain_raw_bundle(chat_id)
+
+        if not bundle:
+            await safe_edit_message(
+                context.bot, chat_id=chat_id, message_id=loading.message_id,
+                text="❌ Keine Brain-Einträge gefunden. Nutze zuerst /upload.",
+            )
+            return
+
+        await safe_edit_message(
+            context.bot, chat_id=chat_id, message_id=loading.message_id,
+            text="📦 Export fertig, sende Dateien...",
+        )
+
+        md_buffer = BytesIO(bundle.encode("utf-8"))
+        md_buffer.name = f"brain_raw_export_{datetime.now().strftime('%Y%m%d_%H%M')}.md"
+        await context.bot.send_document(
+            chat_id=chat_id,
+            document=md_buffer,
+            filename=md_buffer.name,
+            caption=f"📦 Brain-Rohexport (Markdown, unkomprimiert)\n~{len(bundle):,} Zeichen",
+        )
+
+        pdf_buffer = create_wiki_pdf(bundle, title=f"Brain Rohexport – Chat {chat_id}")
+        await context.bot.send_document(
+            chat_id=chat_id,
+            document=pdf_buffer,
+            filename=pdf_buffer.name,
+            caption="✅ Brain-Rohexport (PDF)",
+        )
+
+    except Exception as exc:
+        logger.exception("cmd_brainexport Fehler")
+        try:
+            await safe_edit_message(
+                context.bot, chat_id=chat_id, message_id=loading.message_id,
+                text=f"❌ Fehler beim Brain-Export:\n{str(exc)[:250]}",
+            )
+        except Exception:
+            await update.message.reply_text(f"❌ Fehler beim Brain-Export:\n{str(exc)[:250]}")
+
+
 async def cmd_wikiexport(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     /wikiexport – Laedt den kompletten Wiki-Bestand als Markdown-Datei

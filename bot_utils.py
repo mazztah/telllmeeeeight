@@ -334,7 +334,22 @@ def build_agent_tools(chat_id: str) -> list[AgentTool]:
         result = await save_full_code_to_brain(chat_id)
         return result
 
+    def tool_get_current_datetime(arguments: dict) -> str:
+        """Gibt das exakte aktuelle Datum + Uhrzeit zurueck (Server-Zeit,
+        Zeitzone Europe/Berlin bzw. BOT_TIMEZONE-ENV). Wird zusaetzlich zum
+        automatisch injizierten Zeitkontext (siehe agent.py) bereitgestellt,
+        falls das Modell lieber aktiv danach fragt statt den System-Prompt
+        zu lesen."""
+        from time_utils import current_datetime_tool_result
+        return current_datetime_tool_result()
+
     return [
+        AgentTool(
+            name="get_current_datetime",
+            description="Gibt das exakte, aktuelle Datum und die Uhrzeit zurück. IMMER hierfür benutzen statt zu raten, wenn nach heutigem Datum/Uhrzeit/Wochentag gefragt wird.",
+            parameters={"type": "object", "properties": {}},
+            handler=tool_get_current_datetime,
+        ),
         AgentTool(
             name="web_search",
             description="Sucht aktuelle Web-Informationen.",

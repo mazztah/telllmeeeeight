@@ -4,7 +4,31 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Awaitable, Callable
 
+from time_utils import current_datetime_context
+
 logger = logging.getLogger(__name__)
+
+# Wird jedem Agent-Lauf als eigene System-Message vorangestellt (siehe
+# run_agent_loop). Deckt zwei Luecken ab, die vorher komplett fehlten:
+#   1. Das Modell kannte weder Datum noch Uhrzeit (dafuer gibt es jetzt
+#      zusaetzlich time_utils.current_datetime_context()).
+#   2. Es gab keine Anweisung, WANN die registrierten Tools (Brain-Suche,
+#      Websuche, Code-Brain) tatsaechlich benutzt werden sollen - die
+#      Modelle hier (qwen/llama/gpt, im Gegensatz zum Hauptchat-Modell
+#      "groq/compound") haben KEINE eingebaute Live-Suche und muessen
+#      explizit dazu angestossen werden.
+AGENT_BASE_SYSTEM = (
+    "Du bist ein Tool-nutzender Agent mit Zugriff auf mehrere Funktionen "
+    "(siehe verfuegbare Tools). Grundregeln:\n"
+    "- Fuer Fragen nach Datum, Uhrzeit oder 'heute/jetzt': nutze NUR den "
+    "unten angegebenen aktuellen Zeitstempel, rate nie.\n"
+    "- Fuer Fragen zu gespeicherten Dokumenten, Notizen oder Code: rufe "
+    "IMMER zuerst ein passendes Brain-Tool auf (semantic_brain_search, "
+    "list_brain_entries, load_brain_entry, search_code_brain), bevor du "
+    "aus dem Gedaechtnis antwortest.\n"
+    "- Fuer aktuelle/externe Informationen: nutze web_search statt zu raten.\n"
+    "- Antworte erst final, wenn du die relevanten Tools genutzt hast."
+)
 
 ToolHandler = Callable[[dict[str, Any]], Awaitable[str] | str]
 
@@ -51,10 +75,12 @@ async def run_agent_loop(
     model_chain = [model] + [m for m in fallback_models if m != model]
 
     tool_map = {tool.name: tool for tool in tools}
-    from datetime import datetime
-    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    system_message = {"role": "system", "content": f"Aktuelles Datum und Uhrzeit: {current_datetime}."}
-    messages = [system_message] + list(history)
+    # WICHTIG: `messages` ist eine NEUE Liste (list(history) kopiert nur die
+    # Referenzen der Eintraege, haengt aber nichts an `history` selbst an).
+    # Die folgenden System-Messages werden also NICHT mit-persistiert und
+    # sind bei jedem Aufruf garantiert taggenau/uhrzeitgenau aktuell.
+    system_context = f"{AGENT_BASE_SYSTEM}\n\n{current_datetime_context()}"
+    messages = [{"role": "system", "content": system_context}] + list(history)
     messages.append({"role": "user", "content": user_message})
     used_tools: list[str] = []
 

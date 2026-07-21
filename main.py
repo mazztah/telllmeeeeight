@@ -212,7 +212,7 @@ try:
         handle_ttv26, cmd_lyria, cmd_suno, cmd_freebeat, cmd_convert3d, cmd_text_to_3d,
         cmd_readme, cmd_diagnose, cmd_savecode, cmd_jobqueen, cmd_mooost, cmd_landme,
         cmd_immotracker, cmd_pianosearch, cmd_bkabr, cmd_marketing,
-        cmd_wikisync, cmd_wikistatus, cmd_wikiexport,
+        cmd_wikisync, cmd_wikistatus, cmd_wikiexport, cmd_brainexport,
     )
 except ImportError as e:
     logger.warning(f"handlers_cmd nicht verfuegbar: {e}")
@@ -292,6 +292,7 @@ except ImportError as e:
     def cmd_wikisync(*args, **kwargs): pass
     def cmd_wikistatus(*args, **kwargs): pass
     def cmd_wikiexport(*args, **kwargs): pass
+    def cmd_brainexport(*args, **kwargs): pass
 
 try:
     from trichome_handler import cmd_trichome
@@ -524,6 +525,7 @@ if application:
     application.add_handler(CommandHandler("wikisync", cmd_wikisync))
     application.add_handler(CommandHandler("wikistatus", cmd_wikistatus))
     application.add_handler(CommandHandler("wikiexport", cmd_wikiexport))
+    application.add_handler(CommandHandler("brainexport", cmd_brainexport))
     application.add_handler(CommandHandler("convert", cmd_convert))
     application.add_handler(CommandHandler("textconvert", cmd_textconvert))
     application.add_handler(CommandHandler("yt", cmd_yt))
