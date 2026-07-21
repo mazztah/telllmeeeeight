@@ -19,16 +19,17 @@
             --neon-cyan: #00f3ff;
             --neon-magenta: #ff00ff;
             --neon-yellow: #fdf000;
+            --neon-green: #39ff14;
             --dark-bg: #05000a;
             --glass: rgba(20, 0, 40, 0.7);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            background: var(--dark-bg); 
-            overflow: hidden; 
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-            color: white; 
+        body {
+            background: var(--dark-bg);
+            overflow: hidden;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: white;
             perspective: 1000px;
             touch-action: none;
         }
@@ -58,9 +59,19 @@
             flex-wrap: wrap;
         }
 
-        .stat-box { text-align: center; flex: 1; min-width: 80px; }
-        .label { font-size: 12px; text-transform: uppercase; color: var(--neon-cyan); letter-spacing: 2px; }
-        .value { font-size: 24px; font-weight: bold; text-shadow: 0 0 10px var(--neon-cyan); }
+        .stat-box { text-align: center; flex: 1; min-width: 70px; }
+        .label { font-size: 11px; text-transform: uppercase; color: var(--neon-cyan); letter-spacing: 2px; }
+        .value { font-size: 22px; font-weight: bold; text-shadow: 0 0 10px var(--neon-cyan); }
+
+        /* XP-Leiste */
+        #xp-bar-wrap {
+            width: 100%; height: 6px; background: rgba(255,255,255,0.1);
+            border-radius: 4px; margin-top: 6px; overflow: hidden;
+        }
+        #xp-bar-fill {
+            height: 100%; width: 0%; background: linear-gradient(90deg, var(--neon-magenta), var(--neon-cyan));
+            transition: width 0.4s ease;
+        }
 
         #dealer-chat {
             position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
@@ -87,21 +98,86 @@
             background: var(--neon-cyan); color: black; box-shadow: 0 0 20px var(--neon-cyan);
         }
         .btn:disabled { opacity: 0.3; border-color: gray; color: gray; }
+        .btn-small { padding: 8px 14px; font-size: 11px; }
+        .btn-icon { width: 44px; height: 44px; padding: 0; display:flex; align-items:center; justify-content:center; }
 
         #bet-controls { display: flex; align-items: center; gap: 10px; }
-        .bet-btn { 
-            width: 36px; height: 36px; border-radius: 50%; 
-            border: 1px solid var(--neon-cyan); background: none; 
+        .bet-btn {
+            width: 36px; height: 36px; border-radius: 50%;
+            border: 1px solid var(--neon-cyan); background: none;
             color: white; cursor: pointer; font-size: 18px; display: flex;
             align-items: center; justify-content: center;
         }
 
+        /* Difficulty Selector */
+        #difficulty-bar {
+            display: flex; justify-content: center; gap: 8px; margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .diff-btn {
+            background: transparent; border: 1px solid rgba(255,255,255,0.3);
+            color: rgba(255,255,255,0.6); padding: 6px 14px; border-radius: 20px;
+            cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+            pointer-events: auto; transition: all 0.2s;
+        }
+        .diff-btn.active {
+            border-color: var(--neon-yellow); color: var(--neon-yellow);
+            box-shadow: 0 0 10px rgba(253, 240, 0, 0.4);
+        }
+
+        /* Daily Challenge Widget */
+        #daily-widget {
+            position: absolute; top: 100px; right: 20px; width: 190px;
+            font-size: 12px; pointer-events: auto; display: none;
+        }
+        #daily-widget.show { display: block; }
+        #daily-widget .label { color: var(--neon-yellow); }
+        #daily-progress-wrap {
+            width: 100%; height: 5px; background: rgba(255,255,255,0.15);
+            border-radius: 3px; margin-top: 6px; overflow: hidden;
+        }
+        #daily-progress-fill {
+            height: 100%; background: var(--neon-green); width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* Sound Toggle */
+        #sound-toggle {
+            position: absolute; top: 8px; right: 12px; z-index: 250;
+            background: none; border: 1px solid var(--neon-cyan); color: var(--neon-cyan);
+            border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-size: 14px;
+        }
+
+        /* Achievement Toast */
+        #achievement-toast {
+            position: absolute; top: -100px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 340px; z-index: 500;
+            transition: top 0.5s cubic-bezier(.2,1.4,.4,1);
+            pointer-events: none;
+        }
+        #achievement-toast.show { top: 60px; }
+        #achievement-toast .glass-panel {
+            border-color: var(--neon-yellow); box-shadow: 0 0 20px rgba(253,240,0,0.5);
+            text-align: center;
+        }
+        #achievement-toast .ach-title { color: var(--neon-yellow); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
+        #achievement-toast .ach-label { font-size: 16px; font-weight: bold; margin-top: 4px; }
+
+        /* Coach Tip */
+        #coach-tip {
+            position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 380px; text-align: center; font-size: 13px;
+            color: var(--neon-green); opacity: 0; transition: opacity 0.4s;
+            pointer-events: none;
+        }
+        #coach-tip.show { opacity: 1; }
+
         /* Leaderboard Modal */
         #leaderboard-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
-            width: 90%; max-width: 320px; display: none; z-index: 1000;
+            width: 90%; max-width: 340px; display: none; z-index: 1000;
         }
-        .lb-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(0,243,255,0.2); }
+        .lb-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(0,243,255,0.2); font-size: 13px; }
 
         /* Telegram WebApp Header spacing */
         #tg-header {
@@ -128,9 +204,10 @@
 
         @media (max-width: 600px) {
             #hud { padding: 15px; padding-top: 45px; }
-            .value { font-size: 20px; }
+            .value { font-size: 18px; }
             #dealer-chat { font-size: 15px; top: 80px; }
             .btn { padding: 10px 18px; font-size: 12px; }
+            #daily-widget { width: 140px; font-size: 10px; top: 80px; right: 10px; padding: 12px; }
         }
     </style>
 </head>
@@ -141,35 +218,67 @@
         <span class="tg-score" id="tg-score-display">Ȼ 1000</span>
     </div>
 
+    <button id="sound-toggle" title="Sound an/aus">🔊</button>
+
     <div id="hud">
-        <div id="top-bar">
-            <div class="glass-panel stat-box">
-                <div class="label">User</div>
-                <div id="user-display" class="value">---</div>
+        <div>
+            <div id="top-bar">
+                <div class="glass-panel stat-box">
+                    <div class="label">User</div>
+                    <div id="user-display" class="value" style="font-size:16px;">---</div>
+                </div>
+                <div class="glass-panel stat-box">
+                    <div class="label">Credits</div>
+                    <div id="balance" class="value">1000</div>
+                </div>
+                <div class="glass-panel stat-box">
+                    <div class="label">Level <span id="level-display">1</span></div>
+                    <div id="xp-bar-wrap"><div id="xp-bar-fill"></div></div>
+                </div>
+                <div class="glass-panel stat-box">
+                    <div class="label">Streak</div>
+                    <div id="streak" class="value">0</div>
+                </div>
             </div>
-            <div class="glass-panel stat-box">
-                <div class="label">Credits</div>
-                <div id="balance" class="value">1000</div>
-            </div>
-            <div class="glass-panel stat-box">
-                <div class="label">Highscore</div>
-                <div id="highscore" class="value">0</div>
+
+            <div id="daily-widget" class="glass-panel">
+                <div class="label">🎯 Daily Challenge</div>
+                <div>Gewinne <span id="daily-target">5</span> Spiele (max. <span id="daily-max-loss">2</span> Fehlversuche)</div>
+                <div id="daily-progress-wrap"><div id="daily-progress-fill"></div></div>
+                <div id="daily-status" style="margin-top:4px; color: var(--neon-yellow);"></div>
             </div>
         </div>
 
         <div id="dealer-chat">Willkommen im Neon-Sumpf, Choom...</div>
+        <div id="coach-tip"></div>
 
-        <div id="controls">
-            <div class="glass-panel" id="bet-controls">
-                <button class="bet-btn" id="bet-minus">−</button>
-                <div style="text-align:center; min-width: 60px;">
-                    <div class="label">Bet</div>
-                    <div id="bet-amount" class="value">50</div>
-                </div>
-                <button class="bet-btn" id="bet-plus">+</button>
+        <div>
+            <div id="difficulty-bar">
+                <button class="diff-btn" data-diff="easy">Easy</button>
+                <button class="diff-btn active" data-diff="normal">Normal</button>
+                <button class="diff-btn" data-diff="hard">Hard</button>
+                <button class="diff-btn" data-diff="chaos">Chaos</button>
+                <button class="diff-btn" data-diff="ai">AI Mode</button>
             </div>
-            <button class="btn" id="play-btn">Spielfeld Aktivieren</button>
-            <button class="btn" id="lb-btn">Bestenliste</button>
+            <div id="controls">
+                <div class="glass-panel" id="bet-controls">
+                    <button class="bet-btn" id="bet-minus">−</button>
+                    <div style="text-align:center; min-width: 60px;">
+                        <div class="label">Bet</div>
+                        <div id="bet-amount" class="value">50</div>
+                    </div>
+                    <button class="bet-btn" id="bet-plus">+</button>
+                </div>
+                <button class="btn" id="play-btn">Spielfeld Aktivieren</button>
+                <button class="btn" id="lb-btn">Bestenliste</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="achievement-toast">
+        <div class="glass-panel">
+            <div class="ach-title">🏆 Achievement freigeschaltet</div>
+            <div class="ach-label" id="ach-label-text"></div>
         </div>
     </div>
 
@@ -193,8 +302,77 @@
         tg.expand();
         tg.ready();
 
+        // ── Sound Engine (rein synthetisiert per WebAudio, keine Assets nötig) ─
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+                this.master = null;
+            }
+            _ensure() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    this.master = this.ctx.createGain();
+                    this.master.gain.value = 0.35;
+                    this.master.connect(this.ctx.destination);
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+            }
+            toggle() {
+                this.enabled = !this.enabled;
+                return this.enabled;
+            }
+            _tone(freq, duration, type = 'sine', startGain = 0.5, glideTo = null) {
+                if (!this.enabled) return;
+                this._ensure();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                if (glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, this.ctx.currentTime + duration);
+                gain.gain.setValueAtTime(startGain, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(this.master);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+            click() { this._tone(880, 0.06, 'square', 0.25); }
+            shuffle() { this._tone(220, 0.12, 'triangle', 0.2, 140); }
+            win() {
+                if (!this.enabled) return;
+                [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+                    setTimeout(() => this._tone(f, 0.28, 'sine', 0.3), i * 90);
+                });
+            }
+            lose() { this._tone(300, 0.5, 'sawtooth', 0.25, 80); }
+            levelup() {
+                if (!this.enabled) return;
+                [392, 523.25, 659.25, 880].forEach((f, i) => {
+                    setTimeout(() => this._tone(f, 0.22, 'triangle', 0.3), i * 70);
+                });
+            }
+            achievement() { this._tone(660, 0.15, 'sine', 0.3, 990); }
+        }
+        const sound = new SoundEngine();
+        document.getElementById('sound-toggle').addEventListener('click', () => {
+            const on = sound.toggle();
+            document.getElementById('sound-toggle').textContent = on ? '🔊' : '🔇';
+        });
+
+        // ── Difficulty-Presets ───────────────────────────────────────────────
+        const DIFFICULTIES = {
+            easy:   { shuffles: 3,  swapDuration: 0.5,  doubleSwapChance: 0.0, fakeStopChance: 0.0, multiplier: 2 },
+            normal: { shuffles: 6,  swapDuration: 0.4,  doubleSwapChance: 0.15, fakeStopChance: 0.1, multiplier: 3 },
+            hard:   { shuffles: 10, swapDuration: 0.28, doubleSwapChance: 0.3, fakeStopChance: 0.25, multiplier: 4 },
+            chaos:  { shuffles: 16, swapDuration: 0.18, doubleSwapChance: 0.45, fakeStopChance: 0.4, multiplier: 6 },
+            ai:     { shuffles: 6,  swapDuration: 0.35, doubleSwapChance: 0.2, fakeStopChance: 0.15, multiplier: 3 }, // wird serverseitig moduliert
+        };
+
         class CyberShellGame {
             constructor() {
+                this.difficulty = 'normal';
+                this.aiAdjustment = { shuffle_delta: 0, speed_factor: 1.0, tip: null };
                 this.initThree();
                 this.initGameLogic();
                 this.setupUI();
@@ -203,7 +381,6 @@
             }
 
             setupTelegramUser() {
-                // Nutze Telegram User statt manueller Eingabe
                 const user = tg.initDataUnsafe?.user;
                 if (user) {
                     this.userName = user.first_name || user.username || "Choom";
@@ -211,7 +388,7 @@
                 } else {
                     this.userName = "Guest_" + Math.floor(Math.random() * 9999);
                 }
-                
+
                 document.getElementById('user-display').textContent = this.userName;
                 document.getElementById('tg-user-display').textContent = this.userName;
                 this.loadPlayerData();
@@ -234,12 +411,11 @@
                 this.controls.enablePan = false;
                 this.controls.maxPolarAngle = Math.PI / 2.1;
 
-                // Post Processing (Bloom)
                 const renderScene = new RenderPass(this.scene, this.camera);
                 this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
                 this.bloomPass.threshold = 0.2;
                 this.bloomPass.strength = 1.2;
-                
+
                 this.composer = new EffectComposer(this.renderer);
                 this.composer.addPass(renderScene);
                 this.composer.addPass(this.bloomPass);
@@ -247,6 +423,7 @@
                 this.initLights();
                 this.createTable();
                 this.createHuts();
+                this.initParticleSystem();
             }
 
             initLights() {
@@ -265,18 +442,16 @@
             }
 
             createTable() {
-                // Glossy Obsidian Table
                 const geo = new THREE.BoxGeometry(15, 0.5, 10);
-                const mat = new THREE.MeshStandardMaterial({ 
-                    color: 0x05000a, 
-                    metalness: 1.0, 
-                    roughness: 0.1 
+                const mat = new THREE.MeshStandardMaterial({
+                    color: 0x05000a,
+                    metalness: 1.0,
+                    roughness: 0.1
                 });
                 const table = new THREE.Mesh(geo, mat);
                 table.position.y = 0;
                 this.scene.add(table);
 
-                // Neon Border
                 const borderGeo = new THREE.BoxGeometry(15.2, 0.1, 10.2);
                 const borderMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
                 const border = new THREE.Mesh(borderGeo, borderMat);
@@ -295,11 +470,10 @@
                 for (let i = 0; i < 3; i++) {
                     const group = new THREE.Group();
 
-                    // Metallic Shell
                     const shellGeo = new THREE.CylinderGeometry(1, 1.2, 1.5, 32);
-                    const shellMat = new THREE.MeshStandardMaterial({ 
-                        color: 0x333333, 
-                        metalness: 1.0, 
+                    const shellMat = new THREE.MeshStandardMaterial({
+                        color: 0x333333,
+                        metalness: 1.0,
                         roughness: 0.2,
                         emissive: 0x000000
                     });
@@ -307,7 +481,6 @@
                     shell.castShadow = true;
                     group.add(shell);
 
-                    // Neon Ring
                     const ringGeo = new THREE.TorusGeometry(1.1, 0.03, 16, 100);
                     const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
                     const ring = new THREE.Mesh(ringGeo, ringMat);
@@ -321,7 +494,6 @@
                     this.scene.add(group);
                 }
 
-                // The Data Core (The Nut)
                 const coreGeo = new THREE.SphereGeometry(0.3, 32, 32);
                 const coreMat = new THREE.MeshBasicMaterial({ color: 0xff00ff });
                 this.core = new THREE.Mesh(coreGeo, coreMat);
@@ -330,13 +502,75 @@
                 this.scene.add(this.core);
             }
 
+            // ── Partikel-System für Gewinn-Effekte ────────────────────────────
+            initParticleSystem() {
+                const count = 200;
+                const geo = new THREE.BufferGeometry();
+                const positions = new Float32Array(count * 3);
+                const velocities = [];
+                for (let i = 0; i < count; i++) {
+                    positions[i * 3] = 0;
+                    positions[i * 3 + 1] = 0;
+                    positions[i * 3 + 2] = 0;
+                    velocities.push(new THREE.Vector3(
+                        (Math.random() - 0.5) * 6,
+                        Math.random() * 6 + 2,
+                        (Math.random() - 0.5) * 6
+                    ));
+                }
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const mat = new THREE.PointsMaterial({
+                    color: 0xfdf000, size: 0.15, transparent: true, opacity: 0
+                });
+                this.particles = new THREE.Points(geo, mat);
+                this.particleVelocities = velocities;
+                this.particlesActive = false;
+                this.particlesLife = 0;
+                this.scene.add(this.particles);
+            }
+
+            burstParticles(origin) {
+                const pos = this.particles.geometry.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    pos.setXYZ(i, origin.x, origin.y, origin.z);
+                }
+                pos.needsUpdate = true;
+                this.particles.material.opacity = 1;
+                this.particlesActive = true;
+                this.particlesLife = 0;
+            }
+
+            updateParticles(dt) {
+                if (!this.particlesActive) return;
+                this.particlesLife += dt;
+                const pos = this.particles.geometry.attributes.position;
+                for (let i = 0; i < pos.count; i++) {
+                    const v = this.particleVelocities[i];
+                    v.y -= 9.8 * dt; // Schwerkraft
+                    pos.setX(i, pos.getX(i) + v.x * dt);
+                    pos.setY(i, pos.getY(i) + v.y * dt);
+                    pos.setZ(i, pos.getZ(i) + v.z * dt);
+                }
+                pos.needsUpdate = true;
+                this.particles.material.opacity = Math.max(0, 1 - this.particlesLife / 1.4);
+                if (this.particlesLife > 1.4) {
+                    this.particlesActive = false;
+                    this.particles.material.opacity = 0;
+                }
+            }
+
             initGameLogic() {
                 this.userName = "Guest";
                 this.balance = 1000;
                 this.bet = 50;
                 this.highscore = 0;
-                this.gameState = 'IDLE'; // IDLE, MIXING, GUESSING
+                this.level = 1;
+                this.xp = 0;
+                this.xpToNext = 100;
+                this.streak = 0;
+                this.gameState = 'IDLE'; // IDLE, MIXING, GUESSING, RESULT
                 this.correctHut = 1;
+                this.guessStartTime = 0;
                 this.dealerPhrases = [
                     "Setz deine Credits, Chooom!!",
                     "Glaubst du wirklich, du kannst mich austricksen?",
@@ -347,26 +581,35 @@
             }
 
             setupUI() {
-                // Betting
                 document.getElementById('bet-plus').addEventListener('click', () => {
                     if (this.bet + 50 <= this.balance) this.bet += 50;
+                    sound.click();
                     this.updateHUD();
                 });
                 document.getElementById('bet-minus').addEventListener('click', () => {
                     if (this.bet > 50) this.bet -= 50;
+                    sound.click();
                     this.updateHUD();
                 });
 
-                // Gameplay
                 document.getElementById('play-btn').addEventListener('click', () => this.startMix());
                 document.getElementById('lb-btn').addEventListener('click', () => this.showLeaderboard());
 
-                // Touch/Click on 3D Huts
+                document.querySelectorAll('.diff-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        if (this.gameState !== 'IDLE') return;
+                        document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.difficulty = btn.dataset.diff;
+                        sound.click();
+                    });
+                });
+
                 const canvas = this.renderer.domElement;
-                
+
                 const handleInteraction = (clientX, clientY) => {
                     if (this.gameState !== 'GUESSING') return;
-                    
+
                     const raycaster = new THREE.Raycaster();
                     const mouse = new THREE.Vector2();
                     mouse.x = (clientX / window.innerWidth) * 2 - 1;
@@ -391,41 +634,113 @@
             }
 
             loadPlayerData() {
-                // Lade aus localStorage als Cache
                 const data = JSON.parse(localStorage.getItem('cyber_shell_data') || '{}');
                 if (data[this.userName]) {
                     this.balance = data[this.userName].balance || 1000;
                     this.highscore = data[this.userName].highscore || 0;
                 }
-                document.getElementById('highscore').textContent = this.highscore;
                 this.updateHUD();
+                this.syncProfileFromServer();
+            }
+
+            async syncProfileFromServer() {
+                try {
+                    const apiBase = this._getApiBase();
+                    const resp = await fetch(`${apiBase}/profile?name=${encodeURIComponent(this.userName)}`);
+                    const data = await resp.json();
+                    if (data.success) this.applyProfile(data.profile);
+                } catch (e) {
+                    console.warn('Profil-Sync fehlgeschlagen:', e);
+                }
+            }
+
+            applyProfile(profile) {
+                this.highscore = Math.max(this.highscore, profile.highscore || 0);
+                this.level = profile.level || 1;
+                this.xp = profile.xp || 0;
+                this.xpToNext = profile.xp_to_next || 100;
+                this.streak = profile.streak || 0;
+                this.updateHUD();
+                this.updateDailyWidget(profile.daily);
+            }
+
+            updateDailyWidget(daily) {
+                if (!daily) return;
+                const widget = document.getElementById('daily-widget');
+                widget.classList.add('show');
+                document.getElementById('daily-target').textContent = daily.target_wins;
+                document.getElementById('daily-max-loss').textContent = daily.max_losses;
+                const pct = Math.min(100, (daily.wins / daily.target_wins) * 100);
+                document.getElementById('daily-progress-fill').style.width = pct + '%';
+                const statusEl = document.getElementById('daily-status');
+                if (daily.completed) {
+                    statusEl.textContent = daily.reward_granted
+                        ? `✅ Belohnung erhalten: +${daily.reward_coins} Coins!`
+                        : '✅ Heute abgeschlossen!';
+                } else {
+                    statusEl.textContent = `${daily.wins}/${daily.target_wins} Siege · ${daily.losses}/${daily.max_losses} Fehlversuche`;
+                }
             }
 
             async savePlayerData() {
-                // localStorage Update
                 const data = JSON.parse(localStorage.getItem('cyber_shell_data') || '{}');
                 if (this.balance > this.highscore) {
                     this.highscore = this.balance;
-                    document.getElementById('highscore').textContent = this.highscore;
                 }
                 data[this.userName] = { balance: this.balance, highscore: this.highscore };
                 localStorage.setItem('cyber_shell_data', JSON.stringify(data));
+            }
 
-                // Server-API Update
+            async submitResult(won, winAmount, reactionMs) {
                 try {
                     const apiBase = this._getApiBase();
-                    await fetch(`${apiBase}/save_score`, {
+                    const resp = await fetch(`${apiBase}/result`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             name: this.userName,
+                            won,
+                            bet: this.bet,
+                            win_amount: winAmount,
                             balance: this.balance,
-                            highscore: this.highscore
+                            difficulty: this.difficulty,
+                            reaction_ms: reactionMs,
                         })
                     });
+                    const data = await resp.json();
+                    if (data.success) {
+                        const prevLevel = this.level;
+                        this.applyProfile(data.profile);
+                        if (this.level > prevLevel) {
+                            sound.levelup();
+                            this.sayDealer(`LEVEL UP! Du bist jetzt Level ${this.level}.`);
+                        }
+                        (data.unlocked_achievements || []).forEach((a, i) => {
+                            setTimeout(() => this.showAchievement(a.label), i * 1800 + 400);
+                        });
+                        if (data.ai_suggestion) {
+                            this.aiAdjustment = data.ai_suggestion;
+                            if (data.ai_suggestion.tip) this.showCoachTip(data.ai_suggestion.tip);
+                        }
+                    }
                 } catch (e) {
                     console.warn('Server-Sync fehlgeschlagen:', e);
                 }
+            }
+
+            showAchievement(label) {
+                const toast = document.getElementById('achievement-toast');
+                document.getElementById('ach-label-text').textContent = label;
+                toast.classList.add('show');
+                sound.achievement();
+                setTimeout(() => toast.classList.remove('show'), 3200);
+            }
+
+            showCoachTip(text) {
+                const el = document.getElementById('coach-tip');
+                el.textContent = '🤖 ' + text;
+                el.classList.add('show');
+                setTimeout(() => el.classList.remove('show'), 4500);
             }
 
             _getApiBase() {
@@ -437,6 +752,10 @@
                 document.getElementById('balance').textContent = this.balance;
                 document.getElementById('bet-amount').textContent = this.bet;
                 document.getElementById('tg-score-display').textContent = 'Ȼ ' + this.balance;
+                document.getElementById('level-display').textContent = this.level;
+                document.getElementById('streak').textContent = this.streak;
+                const pct = this.xpToNext ? Math.min(100, (this.xp / this.xpToNext) * 100) : 0;
+                document.getElementById('xp-bar-fill').style.width = pct + '%';
             }
 
             sayDealer(text) {
@@ -444,6 +763,21 @@
                 el.textContent = text;
                 el.style.opacity = 1;
                 setTimeout(() => el.style.opacity = 0, 3000);
+            }
+
+            // ── Prozedurales Mischen ────────────────────────────────────────
+            getActivePreset() {
+                const base = DIFFICULTIES[this.difficulty] || DIFFICULTIES.normal;
+                if (this.difficulty !== 'ai') return base;
+                // AI Mode: Basiswerte + serverseitige Anpassung aus letzten Runden
+                const adj = this.aiAdjustment || {};
+                return {
+                    shuffles: Math.max(3, base.shuffles + (adj.shuffle_delta || 0)),
+                    swapDuration: base.swapDuration / (adj.speed_factor || 1.0),
+                    doubleSwapChance: base.doubleSwapChance,
+                    fakeStopChance: base.fakeStopChance,
+                    multiplier: base.multiplier,
+                };
             }
 
             async startMix() {
@@ -454,39 +788,52 @@
 
                 this.gameState = 'MIXING';
                 document.getElementById('play-btn').disabled = true;
+                document.querySelectorAll('.diff-btn').forEach(b => b.disabled = true);
                 this.core.visible = false;
                 this.sayDealer(this.dealerPhrases[Math.floor(Math.random() * this.dealerPhrases.length)]);
 
                 this.correctHut = Math.floor(Math.random() * 3);
-                
-                // Mixing Animation Sequence
-                const shuffleCount = 6;
-                for (let i = 0; i < shuffleCount; i++) {
-                    await this.shuffleHuts();
+                const preset = this.getActivePreset();
+                this.currentPreset = preset;
+
+                for (let i = 0; i < preset.shuffles; i++) {
+                    // Fake-Stop: kurze Pause, um den Spieler zu verunsichern
+                    if (Math.random() < preset.fakeStopChance) {
+                        await new Promise(r => setTimeout(r, 150 + Math.random() * 200));
+                    }
+                    // Double-Swap: zwei Vertauschungen quasi gleichzeitig anstoßen
+                    if (Math.random() < preset.doubleSwapChance) {
+                        await Promise.all([this.shuffleHuts(preset), this.shuffleHuts(preset)]);
+                    } else {
+                        await this.shuffleHuts(preset);
+                    }
                 }
 
                 this.gameState = 'GUESSING';
+                this.guessStartTime = performance.now();
                 this.sayDealer("WÄHLE WEISE. Tippe auf einen Hut!");
             }
 
-            shuffleHuts() {
+            shuffleHuts(preset) {
                 return new Promise(resolve => {
                     const h1 = Math.floor(Math.random() * 3);
                     const h2 = Math.floor(Math.random() * 3);
                     if (h1 === h2) return resolve();
 
+                    sound.shuffle();
+
                     const pos1 = this.positions[h1].clone();
                     const pos2 = this.positions[h2].clone();
 
                     gsap.to(this.huts[h1].position, {
-                        x: pos2.x, z: pos2.z, duration: 0.4, ease: "power2.inOut",
+                        x: pos2.x, z: pos2.z, duration: preset.swapDuration, ease: "power2.inOut",
                         onComplete: () => {
                             this.positions[h1].copy(pos2);
                             resolve();
                         }
                     });
                     gsap.to(this.huts[h2].position, {
-                        x: pos1.x, z: pos1.z, duration: 0.4, ease: "power2.inOut",
+                        x: pos1.x, z: pos1.z, duration: preset.swapDuration, ease: "power2.inOut",
                         onComplete: () => {
                             this.positions[h2].copy(pos1);
                         }
@@ -496,55 +843,60 @@
 
             handleGuess(id) {
                 this.gameState = 'RESULT';
+                const reactionMs = Math.round(performance.now() - this.guessStartTime);
                 const isWin = (id === this.correctHut);
-                
-                // Reveal Core
+
                 const winningHut = this.huts[this.correctHut];
                 this.core.position.copy(winningHut.position);
                 this.core.position.y = 0.6;
                 this.core.visible = true;
 
-                // Lift all huts
                 this.huts.forEach(h => gsap.to(h.position, { y: 2, duration: 0.5 }));
 
+                const multiplier = (this.currentPreset && this.currentPreset.multiplier) || 3;
+                let winAmount = 0;
+
                 if (isWin) {
-                    const winAmount = this.bet * 3;
+                    winAmount = this.bet * multiplier;
                     this.balance += winAmount;
                     this.sayDealer(`GLÜCKSTREFFER! +${winAmount} Credits!`);
                     document.getElementById('hud').classList.add('glitch');
+                    sound.win();
+                    this.burstParticles(new THREE.Vector3(winningHut.position.x, 1.2, winningHut.position.z));
                 } else {
                     this.balance -= this.bet;
                     this.sayDealer(`Systemfehler! Du hast verloren. -${this.bet} Credits.`);
+                    sound.lose();
                 }
 
                 this.updateHUD();
                 this.savePlayerData();
+                this.submitResult(isWin, winAmount, reactionMs);
 
                 setTimeout(() => {
                     this.huts.forEach(h => gsap.to(h.position, { y: 0.5, duration: 0.5 }));
                     this.core.visible = false;
                     document.getElementById('hud').classList.remove('glitch');
                     document.getElementById('play-btn').disabled = false;
+                    document.querySelectorAll('.diff-btn').forEach(b => b.disabled = false);
                     this.gameState = 'IDLE';
                 }, 2000);
             }
 
             async showLeaderboard() {
                 let sorted = [];
-                
-                // Versuche Server-Leaderboard zu laden
+
                 try {
                     const apiBase = this._getApiBase();
                     const resp = await fetch(`${apiBase}/leaderboard`);
                     const data = await resp.json();
                     if (data.success && data.leaderboard) {
-                        sorted = data.leaderboard.map(entry => [entry.name, { highscore: entry.highscore, balance: entry.balance }]);
+                        sorted = data.leaderboard.map(entry => [entry.name, { highscore: entry.highscore, balance: entry.balance, level: entry.level }]);
                     }
                 } catch (e) {
                     console.warn('Server-Leaderboard fehlgeschlagen, nutze localStorage:', e);
                 }
 
-                // Fallback auf localStorage
                 if (sorted.length === 0) {
                     const localData = JSON.parse(localStorage.getItem('cyber_shell_data') || '{}');
                     sorted = Object.entries(localData)
@@ -555,7 +907,7 @@
                 const content = document.getElementById('lb-content');
                 content.innerHTML = sorted.map(([name, stats], idx) => `
                     <div class="lb-row">
-                        <span>#${idx + 1} ${name}</span>
+                        <span>#${idx + 1} ${name}${stats.level ? ` (Lv.${stats.level})` : ''}</span>
                         <span style="color:var(--neon-yellow)">${stats.highscore || stats.balance || 0} Ȼ</span>
                     </div>
                 `).join('');
@@ -564,16 +916,24 @@
             }
 
             animate() {
-                requestAnimationFrame(() => this.animate());
-                this.controls.update();
-                this.composer.render();
-                
-                // Subtle Floating Movement for Huts
-                this.huts.forEach((h, i) => {
-                    if (this.gameState === 'IDLE') {
-                        h.position.y = 0.5 + Math.sin(Date.now() * 0.002 + i) * 0.1;
-                    }
-                });
+                let lastTime = performance.now();
+                const loop = () => {
+                    requestAnimationFrame(loop);
+                    const now = performance.now();
+                    const dt = Math.min(0.05, (now - lastTime) / 1000);
+                    lastTime = now;
+
+                    this.controls.update();
+                    this.updateParticles(dt);
+                    this.composer.render();
+
+                    this.huts.forEach((h, i) => {
+                        if (this.gameState === 'IDLE') {
+                            h.position.y = 0.5 + Math.sin(Date.now() * 0.002 + i) * 0.1;
+                        }
+                    });
+                };
+                loop();
             }
         }
 
@@ -588,4 +948,3 @@
     </script>
 </body>
 </html>
-
