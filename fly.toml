@@ -21,19 +21,15 @@ primary_region = 'ams'
   cpu_kind = 'shared'
   cpus = 1
 
-# NEU: Persistenter Volume-Mount fuer DATA_DIR (siehe Dockerfile:
-# ENV DATA_DIR="/home/user/app/data"). Vorher gab es HIER GAR KEIN
-# [[mounts]] - die SQLite-Brain-DB (brain.py, primaerer Speicherort,
-# Supabase ist nur Hintergrund-Best-Effort-Spiegel) lag im ephemeren
-# Container-Dateisystem und ging bei jedem "fly deploy" (neue Machine-
-# Instanz aus neuem Image) verloren, teils auch bei Restarts.
+# HINWEIS (Persistenz-Problem bleibt bestehen, siehe Chat-Verlauf):
+# Ohne [[mounts]] liegt DATA_DIR (SQLite-Brain-DB) im ephemeren
+# Container-Dateisystem und geht bei Redeploys/Neustarts verloren.
+# Der [[mounts]]-Block wurde hier absichtlich wieder entfernt, damit
+# der Deploy ohne vorher angelegtes Fly-Volume durchlaeuft. Sobald du
+# bereit bist, ein Volume anzulegen (Dashboard: fly.io/apps/telllmeeeeight
+# -> Volumes -> Create Volume, Name "brain_data", Region wie deine
+# Machine, z.B. "fra"), kannst du folgenden Block wieder einfuegen:
 #
-# EINMALIG vor dem naechsten Deploy ausfuehren (Volume-Name/Groesse
-# nach Bedarf anpassen, "ams" = primary_region oben):
-#   fly volumes create brain_data --region ams --size 1
-#
-# Falls mehrere Machines/Regionen laufen: pro Region ein eigenes Volume
-# anlegen, sonst kann die Machine nicht in der Region starten.
-[[mounts]]
-  source = "brain_data"
-  destination = "/home/user/app/data"
+# [[mounts]]
+#   source = "brain_data"
+#   destination = "/home/user/app/data"
