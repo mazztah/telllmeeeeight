@@ -81,8 +81,10 @@ async def superagent_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     try:
         history = await build_prompt_history(chat_id)
-        # Füge den SUPER_SYSTEM Prompt zur Historie hinzu
-        history.insert(0, {"role": "system", "content": SUPER_SYSTEM})
+        # BUGFIX: SUPER_SYSTEM wurde vorher nirgends verwendet (toter Code) -
+        # der SuperAgent bekam nie die Anweisung, dass er search_code_brain /
+        # save_code_brain fuer Code-Fragen nutzen soll. Jetzt vorangestellt.
+        history = [{"role": "system", "content": SUPER_SYSTEM}] + history
         tools = build_agent_tools(chat_id)
         logger.info(f"SuperAgent tools available: {len(tools)} tools, history length: {len(history)}")
 

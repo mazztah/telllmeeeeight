@@ -193,7 +193,7 @@ async def compile_wiki_page(
     existing_body = existing.body if existing else "(neue Seite)"
 
     sources_text = "\n\n".join(
-        f"### Quelle: {src.get(\'title\', \'unbenannt\')}\n{src.get(\'content\', \'\')}"
+        f"### Quelle: {src.get('title', 'unbenannt')}\n{src.get('content', '')[:1500]}"
         for src in raw_sources
     )
 
@@ -444,6 +444,63 @@ async def export_wiki_markdown_bundle(chat_id: str) -> str:
     return header + body
 
 
+async def export_brain_raw_bundle(chat_id: str) -> str:
+    """
+    NEU: Voller, verlustfreier Export der Original-Uploads - im Gegensatz
+    zu export_wiki_markdown_bundle() (die nur die LLM-komprimierten
+    Wiki-Zusammenfassungen exportiert, siehe compile_wiki_page: dort
+    werden pro Dokument nur 1500 Zeichen an das LLM gegeben und maximal
+    ~400 Woerter zurueckgegeben - das ist bewusst so ("compile, don't
+    retrieve"), aber fuer ein 1:1-Backup ungeeignet).
+
+    Diese Funktion liest stattdessen direkt die Brain-Eintraege
+    (brain.py:load_all_entries), dekodiert das base64-gespeicherte
+    Original (voller Inhalt, nicht die 2000-Zeichen-Preview) und haengt
+    alles unveraendert aneinander.
+    """
+    import base64 as _b64
+
+    from brain import load_all_entries
+
+    entries = await load_all_entries(chat_id)
+    if not entries:
+        return ""
+
+    parts = [f"# Brain Roh-Export - Chat {chat_id}\nEintraege: {len(entries)}\n\n---\n"]
+    for entry in entries:
+        title = entry.get("title") or entry.get("id", "Eintrag")
+        raw_content = entry.get("content") or ""
+        metadata = entry.get("metadata")
+        if isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except Exception:
+                metadata = {}
+        metadata = metadata or {}
+        mime_type = metadata.get("mime_type", "")
+
+        text = ""
+        # Nur textartige Uploads (md/txt/csv/json/...) lassen sich sinnvoll
+        # als lesbarer Text zurueckdekodieren; Binärdateien (PDF/Bilder)
+        # werden übersprungen, deren extrahierte Vorschau bleibt als Notiz.
+        try:
+            decoded = _b64.b64decode(raw_content)
+            if mime_type.startswith("text") or mime_type in (
+                "unknown", "application/json", "text/markdown",
+            ) or not mime_type:
+                text = decoded.decode("utf-8", errors="replace")
+        except Exception:
+            text = ""
+
+        if not text:
+            text = f"*(Binärdatei oder nicht dekodierbar - mime_type={mime_type or 'unbekannt'})*\n\n" \
+                   f"Vorschau: {metadata.get('extracted_preview', '')}"
+
+        parts.append(f"## {title}\n\n{text}\n\n---\n")
+
+    return "\n".join(parts)
+
+
 def create_wiki_pdf(markdown_bundle: str, title: str = "Wiki Export") -> "BytesIO":
     """PDF-Export des Wiki-Bestands, gleiches Muster wie
     send_code_handler.py:create_pdf_from_markdown - falls reportlab
@@ -473,11 +530,17 @@ def create_wiki_pdf(markdown_bundle: str, title: str = "Wiki Export") -> "BytesI
         if not page_block:
             continue
         heading = page_block.splitlines()[0][:120] if page_block.splitlines() else "Seite"
-        safe_body = (
-            page_block.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        )
+        safe_body = page_block.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         story.append(Paragraph(heading, concept_style))
-        story.append(Paragraph(safe_body.replace("\n", "<br/>"), body_style))
+        # BUGFIX: vorher wurde jeder Seitenblock hart bei 6000 Zeichen
+        # abgeschnitten ("[:6000]") - dadurch gingen laengere Inhalte
+        # klanglos verloren. reportlab kommt mit einzelnen sehr grossen
+        # Paragraphen schlecht klar, darum in ~3000-Zeichen-Chunks an
+        # Absatzgrenzen aufteilen statt zu kappen - kein Datenverlust mehr.
+        CHUNK = 3000
+        text = safe_body.replace("\n", "<br/>")
+        for i in range(0, len(text), CHUNK):
+            story.append(Paragraph(text[i:i + CHUNK], body_style))
         story.append(Spacer(1, 10))
 
     doc.build(story)
