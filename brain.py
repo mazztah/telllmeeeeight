@@ -402,12 +402,28 @@ async def load_entry(chat_id: str, entry_id: str) -> Optional[dict]:
 
 async def load_all_entries(chat_id: str) -> list:
     # 1. SQLite primär (immer schnell, immer verfügbar)
+    sqlite_rows = []
+    sqlite_failed = False
     try:
-        return await asyncio.to_thread(_sqlite_select_all, str(chat_id))
+        sqlite_rows = await asyncio.to_thread(_sqlite_select_all, str(chat_id))
     except Exception as e:
+        sqlite_failed = True
         logger.error(f"load_all_entries SQLite Fehler: {e}")
 
-    # 2. Supabase Fallback (nur wenn SQLite komplett fehlschlägt)
+    if sqlite_rows:
+        return sqlite_rows
+
+    # 2. Supabase Fallback - jetzt echtes Backup-Verhalten: wird nicht nur
+    # bei einem SQLite-Fehler abgefragt, sondern auch dann, wenn SQLite
+    # zwar fehlerfrei lief, aber (z.B. nach einem Fly-Neustart ohne
+    # persistentes Volume) leer zurückkam. Ohne das wuerden nach einem
+    # Container-Neustart faelschlich "keine Eintraege" gemeldet, obwohl
+    # die Daten noch sicher in Supabase liegen.
+    if sqlite_failed:
+        logger.info("load_all_entries: SQLite fehlgeschlagen, versuche Supabase-Fallback")
+    else:
+        logger.info("load_all_entries: SQLite leer, pruefe Supabase als Backup")
+
     supa = get_supabase()
     if supa:
         try:
@@ -417,12 +433,15 @@ async def load_all_entries(chat_id: str) -> list:
                 .order("created_at", desc=True)
                 .execute()
             )
-            return response.data or []
+            rows = response.data or []
+            if rows:
+                logger.info(f"load_all_entries: {len(rows)} Eintraege aus Supabase-Backup geladen")
+            return rows
         except Exception as e:
             _mark_supabase_broken(e)
             logger.warning(f"load_all_entries Supabase fehlgeschlagen: {str(e)[:80]}")
 
-    return []
+    return sqlite_rows
 
 
 # ── List & Delete ──────────────────────────────────────────────────────────────
