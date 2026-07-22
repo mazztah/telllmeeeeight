@@ -4,16 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>NEON SHELL GAME 2077</title>
+    <!-- Telegram WebApp SDK ist die EINZIGE externe Abhängigkeit und wird
+         defensiv geladen: schlägt das Skript fehl (Netzwerk, WebView-Sperre),
+         läuft das Spiel trotzdem über den Fallback-Stub weiter (siehe unten). -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.167.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.167.0/examples/jsm/"
-            }
-        }
-    </script>
     <style>
         :root {
             --neon-cyan: #00f3ff;
@@ -25,17 +19,38 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
+        html, body {
+            width: 100%; height: 100%;
             background: var(--dark-bg);
             overflow: hidden;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: white;
-            perspective: 1000px;
             touch-action: none;
         }
-        canvas { display: block; }
 
-        /* HUD Design */
+        /* ── Hintergrund: animiertes Neon-Grid, rein CSS ─────────────────── */
+        #bg {
+            position: absolute; inset: 0; z-index: 0;
+            background:
+                radial-gradient(ellipse at 50% 30%, rgba(255,0,255,0.12), transparent 60%),
+                radial-gradient(ellipse at 50% 90%, rgba(0,243,255,0.15), transparent 60%),
+                var(--dark-bg);
+            overflow: hidden;
+        }
+        #bg::before {
+            content: '';
+            position: absolute; left: -50%; right: -50%; bottom: -10%; height: 140%;
+            background-image:
+                linear-gradient(rgba(0,243,255,0.25) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,243,255,0.25) 1px, transparent 1px);
+            background-size: 60px 60px;
+            transform: perspective(400px) rotateX(60deg);
+            transform-origin: bottom;
+            animation: gridMove 6s linear infinite;
+        }
+        @keyframes gridMove { from { background-position: 0 0, 0 0; } to { background-position: 0 60px, 60px 0; } }
+
+        /* ── HUD ──────────────────────────────────────────────────────────── */
         #hud {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 100;
@@ -63,7 +78,6 @@
         .label { font-size: 11px; text-transform: uppercase; color: var(--neon-cyan); letter-spacing: 2px; }
         .value { font-size: 22px; font-weight: bold; text-shadow: 0 0 10px var(--neon-cyan); }
 
-        /* XP-Leiste */
         #xp-bar-wrap {
             width: 100%; height: 6px; background: rgba(255,255,255,0.1);
             border-radius: 4px; margin-top: 6px; overflow: hidden;
@@ -93,20 +107,19 @@
             font-weight: bold; text-transform: uppercase; transition: all 0.2s;
             clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
             font-size: 14px;
+            pointer-events: auto;
         }
         .btn:hover:not(:disabled) {
             background: var(--neon-cyan); color: black; box-shadow: 0 0 20px var(--neon-cyan);
         }
-        .btn:disabled { opacity: 0.3; border-color: gray; color: gray; }
-        .btn-small { padding: 8px 14px; font-size: 11px; }
-        .btn-icon { width: 44px; height: 44px; padding: 0; display:flex; align-items:center; justify-content:center; }
+        .btn:disabled { opacity: 0.3; border-color: gray; color: gray; cursor: not-allowed; }
 
         #bet-controls { display: flex; align-items: center; gap: 10px; }
         .bet-btn {
             width: 36px; height: 36px; border-radius: 50%;
             border: 1px solid var(--neon-cyan); background: none;
             color: white; cursor: pointer; font-size: 18px; display: flex;
-            align-items: center; justify-content: center;
+            align-items: center; justify-content: center; pointer-events: auto;
         }
 
         /* Difficulty Selector */
@@ -124,6 +137,7 @@
             border-color: var(--neon-yellow); color: var(--neon-yellow);
             box-shadow: 0 0 10px rgba(253, 240, 0, 0.4);
         }
+        .diff-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
         /* Daily Challenge Widget */
         #daily-widget {
@@ -146,6 +160,7 @@
             position: absolute; top: 8px; right: 12px; z-index: 250;
             background: none; border: 1px solid var(--neon-cyan); color: var(--neon-cyan);
             border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-size: 14px;
+            pointer-events: auto;
         }
 
         /* Achievement Toast */
@@ -202,16 +217,95 @@
             100% { transform: translate(0); }
         }
 
+        /* ── Spielfeld: Becher + Kugel (reines CSS) ──────────────────────── */
+        #stage {
+            position: absolute; inset: 0; z-index: 10;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #game-table {
+            position: relative;
+            width: min(560px, 92vw);
+            height: 240px;
+        }
+        #table-surface {
+            position: absolute; left: 0; right: 0; bottom: 30px; height: 14px;
+            background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
+            opacity: 0.5; border-radius: 50%; filter: blur(2px);
+        }
+
+        .ball {
+            position: absolute; bottom: 40px; width: 34px; height: 34px;
+            left: 50%; transform: translateX(-50%);
+            border-radius: 50%;
+            background: radial-gradient(circle at 32% 28%, #ffffff, var(--neon-magenta) 55%, #660066 100%);
+            box-shadow: 0 0 20px var(--neon-magenta), 0 0 40px rgba(255,0,255,0.4);
+            opacity: 0;
+            transition: left 0.35s ease, opacity 0.2s ease;
+            z-index: 1;
+        }
+
+        .cup {
+            position: absolute; bottom: 30px; left: 50%;
+            width: 108px; height: 128px;
+            transform: translateX(-50%) translateY(var(--lift, 0px));
+            transition: left var(--swap-duration, 0.4s) cubic-bezier(.45,0,.55,1), transform 0.5s cubic-bezier(.34,1.2,.4,1);
+            cursor: pointer;
+            z-index: 5;
+            filter: drop-shadow(0 8px 10px rgba(0,0,0,0.6));
+        }
+        .cup-body {
+            width: 100%; height: 100%;
+            background: linear-gradient(155deg, #666 0%, #222 45%, #050505 60%, #444 100%);
+            clip-path: polygon(18% 0%, 82% 0%, 100% 100%, 0% 100%);
+            border: 1px solid rgba(0,243,255,0.5);
+            box-shadow: inset 0 0 25px rgba(0,243,255,0.15), 0 0 12px rgba(0,243,255,0.25);
+            position: relative;
+        }
+        .cup-ring {
+            position: absolute; left: 50%; top: 22%; transform: translateX(-50%);
+            width: 74%; height: 6px; border-radius: 50%;
+            background: var(--neon-cyan);
+            box-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan);
+        }
+        .cup-idle { animation: cupFloat 2.6s ease-in-out infinite; }
+        .cup:nth-of-type(2) .cup-idle, .cup[data-id="1"].cup-idle { animation-delay: 0.3s; }
+        .cup[data-id="2"].cup-idle { animation-delay: 0.6s; }
+        @keyframes cupFloat {
+            0%, 100% { transform: translateX(-50%) translateY(var(--lift, 0px)); }
+            50% { transform: translateX(-50%) translateY(calc(var(--lift, 0px) - 8px)); }
+        }
+        .cup:active { filter: brightness(1.3) drop-shadow(0 8px 10px rgba(0,0,0,0.6)); }
+        .cup.win-glow .cup-body { border-color: var(--neon-yellow); box-shadow: 0 0 30px var(--neon-yellow), inset 0 0 25px rgba(253,240,0,0.3); }
+
+        /* Partikel (reines CSS/DOM statt Three.js) */
+        .particle {
+            position: absolute; width: 8px; height: 8px; border-radius: 50%;
+            background: var(--neon-yellow);
+            box-shadow: 0 0 8px var(--neon-yellow);
+            pointer-events: none; z-index: 50;
+            animation: particleFly 0.9s ease-out forwards;
+        }
+        @keyframes particleFly {
+            0%   { transform: translate(0,0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--px), var(--py)) scale(0.2); opacity: 0; }
+        }
+
+        canvas { display: none; } /* Altlast-Selektor entfernt Rendering-Reste falls vorhanden */
+
         @media (max-width: 600px) {
             #hud { padding: 15px; padding-top: 45px; }
             .value { font-size: 18px; }
             #dealer-chat { font-size: 15px; top: 80px; }
             .btn { padding: 10px 18px; font-size: 12px; }
             #daily-widget { width: 140px; font-size: 10px; top: 80px; right: 10px; padding: 12px; }
+            .cup { width: 82px; height: 98px; }
+            .ball { width: 26px; height: 26px; }
         }
     </style>
 </head>
 <body>
+
+    <div id="bg"></div>
 
     <div id="tg-header">
         <span class="tg-user" id="tg-user-display">NEON SHELL 2077</span>
@@ -219,6 +313,16 @@
     </div>
 
     <button id="sound-toggle" title="Sound an/aus">🔊</button>
+
+    <div id="stage">
+        <div id="game-table">
+            <div id="table-surface"></div>
+            <div class="ball" id="ball"></div>
+            <div class="cup cup-idle" id="cup-0" data-id="0"><div class="cup-body"><div class="cup-ring"></div></div></div>
+            <div class="cup cup-idle" id="cup-1" data-id="1"><div class="cup-body"><div class="cup-ring"></div></div></div>
+            <div class="cup cup-idle" id="cup-2" data-id="2"><div class="cup-body"><div class="cup-ring"></div></div></div>
+        </div>
+    </div>
 
     <div id="hud">
         <div>
@@ -285,96 +389,74 @@
     <div id="leaderboard-modal" class="glass-panel">
         <h3 style="color: var(--neon-cyan); margin-bottom: 15px; text-align: center;">TOP ROLLERS</h3>
         <div id="lb-content"></div>
-        <button class="btn" style="width: 100%; margin-top: 15px;" onclick="document.getElementById('leaderboard-modal').style.display='none'">Schließen</button>
+        <button class="btn" style="width: 100%; margin-top: 15px;" id="lb-close-btn">Schließen</button>
     </div>
-
-    <canvas id="gameCanvas"></canvas>
 
     <div id="fatal-error" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
          max-width:80%; background:rgba(40,0,0,0.9); border:1px solid #ff3333; color:#ff8888;
          padding:20px; border-radius:10px; font-size:13px; z-index:2000; text-align:center;">
-        ⚠️ Das Spiel konnte nicht geladen werden.<br>
+        ⚠️ Es gab ein Problem beim Laden.<br>
         <span id="fatal-error-detail" style="font-size:11px; opacity:0.8;"></span>
     </div>
+
     <script>
-        // Fängt Fehler ab, die außerhalb des try/catch im module-script passieren
-        // (z.B. wenn der Import von three.js selbst fehlschlägt, CDN blockiert etc.)
         window.addEventListener('error', (e) => {
-            const box = document.getElementById('fatal-error');
             if (!window.__shellGameStarted) {
+                const box = document.getElementById('fatal-error');
                 box.style.display = 'block';
-                document.getElementById('fatal-error-detail').textContent = (e.message || 'Unbekannter Fehler') + ' — prüfe die Browser-Konsole (F12) für Details.';
+                document.getElementById('fatal-error-detail').textContent =
+                    (e.message || 'Unbekannter Fehler') + ' — F12-Konsole prüfen.';
             }
         });
     </script>
-    <script type="module">
-        import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-        // ── Telegram WebApp Integration ──────────────────────────────────────
-        // Fallback, falls die Seite außerhalb von Telegram (z.B. direkt im
-        // Browser zum Testen) geöffnet wird - sonst bricht window.Telegram.WebApp
-        // sofort ab und GAR NICHTS im Script danach wird mehr ausgeführt
-        // (auch keine Event-Listener -> Buttons wirken "tot").
+    <script>
+    (function () {
+        'use strict';
+
+        // ── Telegram WebApp Integration (mit Fallback) ──────────────────────
         const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : {
             expand() {}, ready() {}, initDataUnsafe: {}
         };
         try { tg.expand(); } catch (e) { console.warn('tg.expand() fehlgeschlagen:', e); }
         try { tg.ready(); } catch (e) { console.warn('tg.ready() fehlgeschlagen:', e); }
 
-        // ── Sound Engine (rein synthetisiert per WebAudio, keine Assets nötig) ─
+        // ── Sound Engine (synthetisiert per WebAudio, keine Assets nötig) ───
         class SoundEngine {
-            constructor() {
-                this.ctx = null;
-                this.enabled = true;
-                this.master = null;
-            }
+            constructor() { this.ctx = null; this.enabled = true; this.master = null; }
             _ensure() {
                 if (!this.ctx) {
-                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const AC = window.AudioContext || window.webkitAudioContext;
+                    if (!AC) return false;
+                    this.ctx = new AC();
                     this.master = this.ctx.createGain();
                     this.master.gain.value = 0.35;
                     this.master.connect(this.ctx.destination);
                 }
                 if (this.ctx.state === 'suspended') this.ctx.resume();
+                return true;
             }
-            toggle() {
-                this.enabled = !this.enabled;
-                return this.enabled;
-            }
-            _tone(freq, duration, type = 'sine', startGain = 0.5, glideTo = null) {
+            toggle() { this.enabled = !this.enabled; return this.enabled; }
+            _tone(freq, duration, type, startGain, glideTo) {
                 if (!this.enabled) return;
-                this._ensure();
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = type;
-                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-                if (glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, this.ctx.currentTime + duration);
-                gain.gain.setValueAtTime(startGain, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
-                osc.connect(gain);
-                gain.connect(this.master);
-                osc.start();
-                osc.stop(this.ctx.currentTime + duration);
+                try {
+                    if (!this._ensure()) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type || 'sine';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    if (glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, this.ctx.currentTime + duration);
+                    gain.gain.setValueAtTime(startGain || 0.3, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain); gain.connect(this.master);
+                    osc.start(); osc.stop(this.ctx.currentTime + duration);
+                } catch (e) { /* Audio in manchen WebViews eingeschränkt - Spiel läuft trotzdem weiter */ }
             }
             click() { this._tone(880, 0.06, 'square', 0.25); }
             shuffle() { this._tone(220, 0.12, 'triangle', 0.2, 140); }
-            win() {
-                if (!this.enabled) return;
-                [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
-                    setTimeout(() => this._tone(f, 0.28, 'sine', 0.3), i * 90);
-                });
-            }
+            win() { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => setTimeout(() => this._tone(f, 0.28, 'sine', 0.3), i * 90)); }
             lose() { this._tone(300, 0.5, 'sawtooth', 0.25, 80); }
-            levelup() {
-                if (!this.enabled) return;
-                [392, 523.25, 659.25, 880].forEach((f, i) => {
-                    setTimeout(() => this._tone(f, 0.22, 'triangle', 0.3), i * 70);
-                });
-            }
+            levelup() { [392, 523.25, 659.25, 880].forEach((f, i) => setTimeout(() => this._tone(f, 0.22, 'triangle', 0.3), i * 70)); }
             achievement() { this._tone(660, 0.15, 'sine', 0.3, 990); }
         }
         const sound = new SoundEngine();
@@ -383,203 +465,51 @@
             document.getElementById('sound-toggle').textContent = on ? '🔊' : '🔇';
         });
 
-        // ── Difficulty-Presets ───────────────────────────────────────────────
+        // ── Difficulty-Presets ────────────────────────────────────────────
         const DIFFICULTIES = {
-            easy:   { shuffles: 3,  swapDuration: 0.5,  doubleSwapChance: 0.0, fakeStopChance: 0.0, multiplier: 2 },
-            normal: { shuffles: 6,  swapDuration: 0.4,  doubleSwapChance: 0.15, fakeStopChance: 0.1, multiplier: 3 },
-            hard:   { shuffles: 10, swapDuration: 0.28, doubleSwapChance: 0.3, fakeStopChance: 0.25, multiplier: 4 },
-            chaos:  { shuffles: 16, swapDuration: 0.18, doubleSwapChance: 0.45, fakeStopChance: 0.4, multiplier: 6 },
-            ai:     { shuffles: 6,  swapDuration: 0.35, doubleSwapChance: 0.2, fakeStopChance: 0.15, multiplier: 3 }, // wird serverseitig moduliert
+            easy:   { shuffles: 3,  swapDuration: 0.5,  doubleSwapChance: 0.0,  fakeStopChance: 0.0,  multiplier: 2 },
+            normal: { shuffles: 6,  swapDuration: 0.4,  doubleSwapChance: 0.15, fakeStopChance: 0.1,  multiplier: 3 },
+            hard:   { shuffles: 10, swapDuration: 0.28, doubleSwapChance: 0.3,  fakeStopChance: 0.25, multiplier: 4 },
+            chaos:  { shuffles: 16, swapDuration: 0.18, doubleSwapChance: 0.45, fakeStopChance: 0.4,  multiplier: 6 },
+            ai:     { shuffles: 6,  swapDuration: 0.35, doubleSwapChance: 0.2,  fakeStopChance: 0.15, multiplier: 3 },
         };
+        const SLOT_LEFT_PERCENT = [16, 50, 84];
 
         class CyberShellGame {
             constructor() {
                 this.difficulty = 'normal';
                 this.aiAdjustment = { shuffle_delta: 0, speed_factor: 1.0, tip: null };
-                this.initThree();
                 this.initGameLogic();
+                this.initDom();
                 this.setupUI();
                 this.setupTelegramUser();
-                this.animate();
+            }
+
+            initDom() {
+                this.cupEls = [
+                    document.getElementById('cup-0'),
+                    document.getElementById('cup-1'),
+                    document.getElementById('cup-2'),
+                ];
+                this.ballEl = document.getElementById('ball');
+                // slotOfHut[hutId] = aktueller Slot-Index (0/1/2) dieses Bechers
+                this.slotOfHut = [0, 1, 2];
+                this.cupEls.forEach((el, i) => {
+                    el.style.left = SLOT_LEFT_PERCENT[this.slotOfHut[i]] + '%';
+                });
             }
 
             setupTelegramUser() {
-                const user = tg.initDataUnsafe?.user;
+                const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
                 if (user) {
                     this.userName = user.first_name || user.username || "Choom";
                     if (user.last_name) this.userName += " " + user.last_name;
                 } else {
                     this.userName = "Guest_" + Math.floor(Math.random() * 9999);
                 }
-
                 document.getElementById('user-display').textContent = this.userName;
                 document.getElementById('tg-user-display').textContent = this.userName;
                 this.loadPlayerData();
-            }
-
-            initThree() {
-                this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x020005);
-                this.scene.fog = new THREE.FogExp2(0x020005, 0.05);
-
-                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-                this.camera.position.set(0, 7, 10);
-
-                this.renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('gameCanvas'), antialias: true });
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.toneMapping = THREE.ReinhardToneMapping;
-
-                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-                this.controls.enableZoom = false;
-                this.controls.enablePan = false;
-                this.controls.maxPolarAngle = Math.PI / 2.1;
-
-                const renderScene = new RenderPass(this.scene, this.camera);
-                this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-                this.bloomPass.threshold = 0.2;
-                this.bloomPass.strength = 1.2;
-
-                this.composer = new EffectComposer(this.renderer);
-                this.composer.addPass(renderScene);
-                this.composer.addPass(this.bloomPass);
-
-                this.initLights();
-                this.createTable();
-                this.createHuts();
-                this.initParticleSystem();
-            }
-
-            initLights() {
-                const ambient = new THREE.AmbientLight(0x404040, 0.5);
-                this.scene.add(ambient);
-
-                const spot1 = new THREE.SpotLight(0x00f3ff, 10);
-                spot1.position.set(-5, 10, 5);
-                spot1.castShadow = true;
-                this.scene.add(spot1);
-
-                const spot2 = new THREE.SpotLight(0xff00ff, 10);
-                spot2.position.set(5, 10, 5);
-                spot2.castShadow = true;
-                this.scene.add(spot2);
-            }
-
-            createTable() {
-                const geo = new THREE.BoxGeometry(15, 0.5, 10);
-                const mat = new THREE.MeshStandardMaterial({
-                    color: 0x05000a,
-                    metalness: 1.0,
-                    roughness: 0.1
-                });
-                const table = new THREE.Mesh(geo, mat);
-                table.position.y = 0;
-                this.scene.add(table);
-
-                const borderGeo = new THREE.BoxGeometry(15.2, 0.1, 10.2);
-                const borderMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
-                const border = new THREE.Mesh(borderGeo, borderMat);
-                border.position.y = 0.2;
-                this.scene.add(border);
-            }
-
-            createHuts() {
-                this.huts = [];
-                this.positions = [
-                    new THREE.Vector3(-4, 0.5, 0),
-                    new THREE.Vector3(0, 0.5, 0),
-                    new THREE.Vector3(4, 0.5, 0)
-                ];
-
-                for (let i = 0; i < 3; i++) {
-                    const group = new THREE.Group();
-
-                    const shellGeo = new THREE.CylinderGeometry(1, 1.2, 1.5, 32);
-                    const shellMat = new THREE.MeshStandardMaterial({
-                        color: 0x333333,
-                        metalness: 1.0,
-                        roughness: 0.2,
-                        emissive: 0x000000
-                    });
-                    const shell = new THREE.Mesh(shellGeo, shellMat);
-                    shell.castShadow = true;
-                    group.add(shell);
-
-                    const ringGeo = new THREE.TorusGeometry(1.1, 0.03, 16, 100);
-                    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
-                    const ring = new THREE.Mesh(ringGeo, ringMat);
-                    ring.rotation.x = Math.PI / 2;
-                    ring.position.y = 0.75;
-                    group.add(ring);
-
-                    group.position.copy(this.positions[i]);
-                    group.userData = { id: i };
-                    this.huts.push(group);
-                    this.scene.add(group);
-                }
-
-                const coreGeo = new THREE.SphereGeometry(0.3, 32, 32);
-                const coreMat = new THREE.MeshBasicMaterial({ color: 0xff00ff });
-                this.core = new THREE.Mesh(coreGeo, coreMat);
-                this.core.position.set(0, 0.6, 0);
-                this.core.visible = false;
-                this.scene.add(this.core);
-            }
-
-            // ── Partikel-System für Gewinn-Effekte ────────────────────────────
-            initParticleSystem() {
-                const count = 200;
-                const geo = new THREE.BufferGeometry();
-                const positions = new Float32Array(count * 3);
-                const velocities = [];
-                for (let i = 0; i < count; i++) {
-                    positions[i * 3] = 0;
-                    positions[i * 3 + 1] = 0;
-                    positions[i * 3 + 2] = 0;
-                    velocities.push(new THREE.Vector3(
-                        (Math.random() - 0.5) * 6,
-                        Math.random() * 6 + 2,
-                        (Math.random() - 0.5) * 6
-                    ));
-                }
-                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                const mat = new THREE.PointsMaterial({
-                    color: 0xfdf000, size: 0.15, transparent: true, opacity: 0
-                });
-                this.particles = new THREE.Points(geo, mat);
-                this.particleVelocities = velocities;
-                this.particlesActive = false;
-                this.particlesLife = 0;
-                this.scene.add(this.particles);
-            }
-
-            burstParticles(origin) {
-                const pos = this.particles.geometry.attributes.position;
-                for (let i = 0; i < pos.count; i++) {
-                    pos.setXYZ(i, origin.x, origin.y, origin.z);
-                }
-                pos.needsUpdate = true;
-                this.particles.material.opacity = 1;
-                this.particlesActive = true;
-                this.particlesLife = 0;
-            }
-
-            updateParticles(dt) {
-                if (!this.particlesActive) return;
-                this.particlesLife += dt;
-                const pos = this.particles.geometry.attributes.position;
-                for (let i = 0; i < pos.count; i++) {
-                    const v = this.particleVelocities[i];
-                    v.y -= 9.8 * dt; // Schwerkraft
-                    pos.setX(i, pos.getX(i) + v.x * dt);
-                    pos.setY(i, pos.getY(i) + v.y * dt);
-                    pos.setZ(i, pos.getZ(i) + v.z * dt);
-                }
-                pos.needsUpdate = true;
-                this.particles.material.opacity = Math.max(0, 1 - this.particlesLife / 1.4);
-                if (this.particlesLife > 1.4) {
-                    this.particlesActive = false;
-                    this.particles.material.opacity = 0;
-                }
             }
 
             initGameLogic() {
@@ -617,6 +547,9 @@
 
                 document.getElementById('play-btn').addEventListener('click', () => this.startMix());
                 document.getElementById('lb-btn').addEventListener('click', () => this.showLeaderboard());
+                document.getElementById('lb-close-btn').addEventListener('click', () => {
+                    document.getElementById('leaderboard-modal').style.display = 'none';
+                });
 
                 document.querySelectorAll('.diff-btn').forEach(btn => {
                     btn.addEventListener('click', () => {
@@ -628,32 +561,16 @@
                     });
                 });
 
-                const canvas = this.renderer.domElement;
-
-                const handleInteraction = (clientX, clientY) => {
-                    if (this.gameState !== 'GUESSING') return;
-
-                    const raycaster = new THREE.Raycaster();
-                    const mouse = new THREE.Vector2();
-                    mouse.x = (clientX / window.innerWidth) * 2 - 1;
-                    mouse.y = -(clientY / window.innerHeight) * 2 + 1;
-
-                    raycaster.setFromCamera(mouse, this.camera);
-                    const intersects = raycaster.intersectObjects(this.huts, true);
-
-                    if (intersects.length > 0) {
-                        const hutGroup = intersects[0].object.parent;
-                        this.handleGuess(hutGroup.userData.id);
-                    }
-                };
-
-                canvas.addEventListener('mousedown', (e) => handleInteraction(e.clientX, e.clientY));
-                canvas.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    if (e.touches.length > 0) {
-                        handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
-                    }
-                }, { passive: false });
+                // Klick/Touch direkt auf die Becher - kein Raycasting nötig
+                this.cupEls.forEach(el => {
+                    const onPick = (ev) => {
+                        ev.preventDefault();
+                        if (this.gameState !== 'GUESSING') return;
+                        this.handleGuess(parseInt(el.dataset.id, 10));
+                    };
+                    el.addEventListener('click', onPick);
+                    el.addEventListener('touchstart', onPick, { passive: false });
+                });
             }
 
             loadPlayerData() {
@@ -705,11 +622,9 @@
                 }
             }
 
-            async savePlayerData() {
+            savePlayerData() {
                 const data = JSON.parse(localStorage.getItem('cyber_shell_data') || '{}');
-                if (this.balance > this.highscore) {
-                    this.highscore = this.balance;
-                }
+                if (this.balance > this.highscore) this.highscore = this.balance;
                 data[this.userName] = { balance: this.balance, highscore: this.highscore };
                 localStorage.setItem('cyber_shell_data', JSON.stringify(data));
             }
@@ -721,13 +636,8 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            name: this.userName,
-                            won,
-                            bet: this.bet,
-                            win_amount: winAmount,
-                            balance: this.balance,
-                            difficulty: this.difficulty,
-                            reaction_ms: reactionMs,
+                            name: this.userName, won, bet: this.bet, win_amount: winAmount,
+                            balance: this.balance, difficulty: this.difficulty, reaction_ms: reactionMs,
                         })
                     });
                     const data = await resp.json();
@@ -785,14 +695,12 @@
                 const el = document.getElementById('dealer-chat');
                 el.textContent = text;
                 el.style.opacity = 1;
-                setTimeout(() => el.style.opacity = 0, 3000);
+                setTimeout(() => { el.style.opacity = 0; }, 3000);
             }
 
-            // ── Prozedurales Mischen ────────────────────────────────────────
             getActivePreset() {
                 const base = DIFFICULTIES[this.difficulty] || DIFFICULTIES.normal;
                 if (this.difficulty !== 'ai') return base;
-                // AI Mode: Basiswerte + serverseitige Anpassung aus letzten Runden
                 const adj = this.aiAdjustment || {};
                 return {
                     shuffles: Math.max(3, base.shuffles + (adj.shuffle_delta || 0)),
@@ -801,6 +709,12 @@
                     fakeStopChance: base.fakeStopChance,
                     multiplier: base.multiplier,
                 };
+            }
+
+            _setCupLeft(hutId, duration) {
+                const el = this.cupEls[hutId];
+                el.style.setProperty('--swap-duration', duration + 's');
+                el.style.left = SLOT_LEFT_PERCENT[this.slotOfHut[hutId]] + '%';
             }
 
             async startMix() {
@@ -812,7 +726,8 @@
                 this.gameState = 'MIXING';
                 document.getElementById('play-btn').disabled = true;
                 document.querySelectorAll('.diff-btn').forEach(b => b.disabled = true);
-                this.core.visible = false;
+                this.cupEls.forEach(el => el.classList.remove('cup-idle', 'win-glow'));
+                this.ballEl.style.opacity = 0;
                 this.sayDealer(this.dealerPhrases[Math.floor(Math.random() * this.dealerPhrases.length)]);
 
                 this.correctHut = Math.floor(Math.random() * 3);
@@ -820,11 +735,9 @@
                 this.currentPreset = preset;
 
                 for (let i = 0; i < preset.shuffles; i++) {
-                    // Fake-Stop: kurze Pause, um den Spieler zu verunsichern
                     if (Math.random() < preset.fakeStopChance) {
-                        await new Promise(r => setTimeout(r, 150 + Math.random() * 200));
+                        await this._wait(150 + Math.random() * 200);
                     }
-                    // Double-Swap: zwei Vertauschungen quasi gleichzeitig anstoßen
                     if (Math.random() < preset.doubleSwapChance) {
                         await Promise.all([this.shuffleHuts(preset), this.shuffleHuts(preset)]);
                     } else {
@@ -837,31 +750,23 @@
                 this.sayDealer("WÄHLE WEISE. Tippe auf einen Hut!");
             }
 
+            _wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
             shuffleHuts(preset) {
-                return new Promise(resolve => {
-                    const h1 = Math.floor(Math.random() * 3);
-                    const h2 = Math.floor(Math.random() * 3);
-                    if (h1 === h2) return resolve();
+                const h1 = Math.floor(Math.random() * 3);
+                const h2 = Math.floor(Math.random() * 3);
+                if (h1 === h2) return Promise.resolve();
 
-                    sound.shuffle();
+                sound.shuffle();
 
-                    const pos1 = this.positions[h1].clone();
-                    const pos2 = this.positions[h2].clone();
+                const tmp = this.slotOfHut[h1];
+                this.slotOfHut[h1] = this.slotOfHut[h2];
+                this.slotOfHut[h2] = tmp;
 
-                    gsap.to(this.huts[h1].position, {
-                        x: pos2.x, z: pos2.z, duration: preset.swapDuration, ease: "power2.inOut",
-                        onComplete: () => {
-                            this.positions[h1].copy(pos2);
-                            resolve();
-                        }
-                    });
-                    gsap.to(this.huts[h2].position, {
-                        x: pos1.x, z: pos1.z, duration: preset.swapDuration, ease: "power2.inOut",
-                        onComplete: () => {
-                            this.positions[h2].copy(pos1);
-                        }
-                    });
-                });
+                this._setCupLeft(h1, preset.swapDuration);
+                this._setCupLeft(h2, preset.swapDuration);
+
+                return this._wait(preset.swapDuration * 1000 + 20);
             }
 
             handleGuess(id) {
@@ -869,12 +774,14 @@
                 const reactionMs = Math.round(performance.now() - this.guessStartTime);
                 const isWin = (id === this.correctHut);
 
-                const winningHut = this.huts[this.correctHut];
-                this.core.position.copy(winningHut.position);
-                this.core.position.y = 0.6;
-                this.core.visible = true;
+                // Kugel unter dem Gewinner-Becher positionieren und sichtbar machen
+                const winSlot = SLOT_LEFT_PERCENT[this.slotOfHut[this.correctHut]];
+                this.ballEl.style.left = winSlot + '%';
+                this.ballEl.style.opacity = 1;
 
-                this.huts.forEach(h => gsap.to(h.position, { y: 2, duration: 0.5 }));
+                // Alle Becher anheben (Reveal)
+                this.cupEls.forEach(el => el.style.setProperty('--lift', '-90px'));
+                this.cupEls[this.correctHut].classList.add('win-glow');
 
                 const multiplier = (this.currentPreset && this.currentPreset.multiplier) || 3;
                 let winAmount = 0;
@@ -885,7 +792,7 @@
                     this.sayDealer(`GLÜCKSTREFFER! +${winAmount} Credits!`);
                     document.getElementById('hud').classList.add('glitch');
                     sound.win();
-                    this.burstParticles(new THREE.Vector3(winningHut.position.x, 1.2, winningHut.position.z));
+                    this.burstParticles(winSlot);
                 } else {
                     this.balance -= this.bet;
                     this.sayDealer(`Systemfehler! Du hast verloren. -${this.bet} Credits.`);
@@ -897,8 +804,12 @@
                 this.submitResult(isWin, winAmount, reactionMs);
 
                 setTimeout(() => {
-                    this.huts.forEach(h => gsap.to(h.position, { y: 0.5, duration: 0.5 }));
-                    this.core.visible = false;
+                    this.cupEls.forEach(el => {
+                        el.style.setProperty('--lift', '0px');
+                        el.classList.add('cup-idle');
+                        el.classList.remove('win-glow');
+                    });
+                    this.ballEl.style.opacity = 0;
                     document.getElementById('hud').classList.remove('glitch');
                     document.getElementById('play-btn').disabled = false;
                     document.querySelectorAll('.diff-btn').forEach(b => b.disabled = false);
@@ -906,9 +817,30 @@
                 }, 2000);
             }
 
+            // ── Partikel-Explosion bei Gewinn (reines DOM/CSS) ─────────────
+            burstParticles(leftPercent) {
+                const table = document.getElementById('game-table');
+                const rect = table.getBoundingClientRect();
+                const originX = rect.width * (leftPercent / 100);
+                const originY = rect.height - 60;
+
+                for (let i = 0; i < 24; i++) {
+                    const p = document.createElement('div');
+                    p.className = 'particle';
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = 60 + Math.random() * 90;
+                    p.style.setProperty('--px', Math.cos(angle) * dist + 'px');
+                    p.style.setProperty('--py', Math.sin(angle) * dist - 40 + 'px');
+                    p.style.left = originX + 'px';
+                    p.style.top = originY + 'px';
+                    p.style.background = i % 3 === 0 ? 'var(--neon-yellow)' : (i % 3 === 1 ? 'var(--neon-magenta)' : 'var(--neon-cyan)');
+                    table.appendChild(p);
+                    setTimeout(() => p.remove(), 950);
+                }
+            }
+
             async showLeaderboard() {
                 let sorted = [];
-
                 try {
                     const apiBase = this._getApiBase();
                     const resp = await fetch(`${apiBase}/leaderboard`);
@@ -937,27 +869,6 @@
 
                 document.getElementById('leaderboard-modal').style.display = 'block';
             }
-
-            animate() {
-                let lastTime = performance.now();
-                const loop = () => {
-                    requestAnimationFrame(loop);
-                    const now = performance.now();
-                    const dt = Math.min(0.05, (now - lastTime) / 1000);
-                    lastTime = now;
-
-                    this.controls.update();
-                    this.updateParticles(dt);
-                    this.composer.render();
-
-                    this.huts.forEach((h, i) => {
-                        if (this.gameState === 'IDLE') {
-                            h.position.y = 0.5 + Math.sin(Date.now() * 0.002 + i) * 0.1;
-                        }
-                    });
-                };
-                loop();
-            }
         }
 
         try {
@@ -967,16 +878,9 @@
             console.error('Shellgame Init fehlgeschlagen:', e);
             const box = document.getElementById('fatal-error');
             box.style.display = 'block';
-            document.getElementById('fatal-error-detail').textContent = (e.message || String(e)) + ' — prüfe die Browser-Konsole (F12) für Details.';
+            document.getElementById('fatal-error-detail').textContent = (e.message || String(e)) + ' — F12-Konsole prüfen.';
         }
-
-        window.addEventListener('resize', () => {
-            if (!window.game) return;
-            window.game.camera.aspect = window.innerWidth / window.innerHeight;
-            window.game.camera.updateProjectionMatrix();
-            window.game.renderer.setSize(window.innerWidth, window.innerHeight);
-            window.game.composer.setSize(window.innerWidth, window.innerHeight);
-        });
+    })();
     </script>
 </body>
 </html>
