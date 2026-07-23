@@ -3073,7 +3073,14 @@ async def jobqueen_cv_stream(request: Request):
                 tmp_path = tmp.name
                 tmp.write(content_bytes)
             from dv import extract_content
-            extracted_text = extract_content(tmp_path, max_chars=30000)
+            # WICHTIG: extract_content() ist blockierend (PyPDF2 etc.) und wuerde bei
+            # groesseren/mehrseitigen PDFs die einzige Event-Loop (workers=1) fuer
+            # mehrere Sekunden einfrieren -> Server reagiert in dieser Zeit auf GAR
+            # KEINE Anfrage (auch keine Health-Checks) -> vorgeschalteter Proxy sieht
+            # das als "haengt" und liefert 502. Deshalb in einen Thread auslagern.
+            extracted_text = await asyncio.wait_for(
+                asyncio.to_thread(extract_content, tmp_path, 30000), timeout=45.0
+            )
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 try:
@@ -3110,6 +3117,7 @@ async def jobqueen_cv_stream(request: Request):
                         yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
                     elif tag == "done":
                         profile = {}
+                        parse_ok = False
                         if full_reply:
                             cleaned = _re_cvs.sub(r'```(?:json)?\s*|\s*```', '', full_reply).strip()
                             s = cleaned.find('{')
@@ -3117,8 +3125,24 @@ async def jobqueen_cv_stream(request: Request):
                             if s != -1 and e != -1:
                                 try:
                                     profile = json.loads(cleaned[s:e + 1])
+                                    parse_ok = bool(profile)
                                 except Exception as _jp:
                                     logger.warning("CV-Stream JSON-Parse: %s", _jp)
+
+                        # NEU: Bei leerer/ungueltiger Antwort (z.B. weil das LLM-Modell
+                        # fehlgeschlagen ist) NICHT stillschweigend ein leeres Profil
+                        # als "fertig" melden - das sah fuer den Nutzer wie eine
+                        # erfolgreiche, aber duerftige Analyse aus. Stattdessen klaren
+                        # Fehler senden und den ggf. vorhandenen alten Profil-Stand
+                        # im State NICHT ueberschreiben.
+                        if not parse_ok:
+                            logger.error(
+                                "CV-Stream: Profil-Analyse fehlgeschlagen (leere/ungueltige LLM-Antwort). "
+                                "full_reply_len=%d", len(full_reply)
+                            )
+                            yield f"data: {json.dumps({'error': 'Die Analyse hat kein verwertbares Ergebnis geliefert (LLM-Antwort leer/ungueltig). Bitte kurz warten und erneut versuchen.'}, ensure_ascii=False)}\n\n"
+                            return
+
                         from bot_state import jobqueen_state as _jqs2
                         _jqs2.setdefault(chat_id, {})
                         _jqs2[chat_id]["profile"] = profile
@@ -3140,6 +3164,13 @@ async def jobqueen_cv_stream(request: Request):
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    except asyncio.TimeoutError:
+        logger.error("jobqueen_cv_stream: Datei-Extraktion Timeout (>45s)")
+        return JSONResponse(
+            {"error": "Die Datei konnte nicht rechtzeitig verarbeitet werden (Timeout). "
+                      "Bitte eine kleinere/einfachere PDF-Datei versuchen."},
+            status_code=504,
+        )
     except Exception as e:
         logger.error("jobqueen_cv_stream Fehler: %s", e, exc_info=True)
         return JSONResponse({"error": str(e)[:500]}, status_code=500)
@@ -3180,7 +3211,12 @@ async def jobqueen_cv_analyze(request: Request):
                 tmp.write(content)
 
             from dv import extract_content
-            extracted_text = extract_content(tmp_path, max_chars=30000)
+            # Siehe cv_stream: blockierender Call -> in Thread auslagern + Timeout,
+            # sonst friert die einzige Event-Loop ein und der vorgeschaltete Proxy
+            # liefert 502 fuer alle parallelen Anfragen.
+            extracted_text = await asyncio.wait_for(
+                asyncio.to_thread(extract_content, tmp_path, 30000), timeout=45.0
+            )
 
             from bot_ai import generate_structured_json
             import re as _re_cv
@@ -3229,6 +3265,17 @@ async def jobqueen_cv_analyze(request: Request):
                         logger.warning("CV JSON-Parse Fehler: %s | Reply[:200]: %s", _je, cleaned_reply[:200])
                         profile = {}
 
+            # NEU: Bei leerer/ungueltiger LLM-Antwort NICHT "success": True mit
+            # leerem Profil melden (sah fuer den Nutzer wie eine erfolgreiche,
+            # aber duerftige Analyse aus) - stattdessen klaren Fehler zurueckgeben
+            # und den evtl. vorhandenen alten Profil-Stand NICHT ueberschreiben.
+            if not profile:
+                logger.error("jobqueen_cv_analyze: leere/ungueltige LLM-Antwort, reply_len=%d",
+                             len(reply or ""))
+                return JSONResponse({
+                    "error": "Die Analyse hat kein verwertbares Ergebnis geliefert "
+                             "(LLM-Antwort leer/ungueltig). Bitte kurz warten und erneut versuchen.",
+                }, status_code=502)
 
             from bot_state import jobqueen_state
             jobqueen_state.setdefault(chat_id, {})
@@ -3247,6 +3294,13 @@ async def jobqueen_cv_analyze(request: Request):
                 except Exception:
                     pass
 
+    except asyncio.TimeoutError:
+        logger.error("jobqueen_cv_analyze: Datei-Extraktion Timeout (>45s)")
+        return JSONResponse(
+            {"error": "Die Datei konnte nicht rechtzeitig verarbeitet werden (Timeout). "
+                      "Bitte eine kleinere/einfachere PDF-Datei versuchen."},
+            status_code=504,
+        )
     except Exception as e:
         logger.error(f"jobqueen_cv_analyze Fehler: {e}", exc_info=True)
         return JSONResponse({"error": str(e)[:500]}, status_code=500)

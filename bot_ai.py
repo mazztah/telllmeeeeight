@@ -352,28 +352,39 @@ async def generate_structured_json(system_prompt: str, user_message: str) -> str
         "llama3-70b-8192",
     ]
 
+    # NEU: Vorher wurde bei JEDEM Fehler ausser einer kleinen Keyword-Liste
+    # (503/over capacity/404/model not found) die Fallback-Kette sofort
+    # abgebrochen ("break") und ein LEERER String zurueckgegeben - z.B. bei
+    # Rate-Limits (429), Timeouts oder Verbindungsfehlern. Das fuehrte dazu,
+    # dass Analysen "erfolgreich, aber leer" durchliefen. Jetzt: bei JEDEM
+    # Fehler die naechsten Modelle probieren, erst nach Erschoepfen aller
+    # Modelle aufgeben. Zusaetzlich Timeout pro Versuch, damit ein
+    # haengender Call nicht die ganze Anfrage blockiert.
     for index, model_name in enumerate(model_list):
         try:
-            completion = await asyncio.to_thread(
-                client.chat.completions.create,
-                model=model_name,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=4096,
-                top_p=0.9,
-                stream=False,
+            completion = await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.chat.completions.create,
+                    model=model_name,
+                    messages=messages,
+                    temperature=0.1,
+                    max_tokens=4096,
+                    top_p=0.9,
+                    stream=False,
+                ),
+                timeout=60.0,
             )
             reply = (completion.choices[0].message.content or "").strip()
+            if not reply:
+                logger.warning("generate_structured_json Modell %s lieferte leere Antwort", model_name)
+                continue
             if index > 0:
                 logger.info("✅ generate_structured_json Fallback auf %s", model_name)
             return reply
 
         except Exception as exc:
-            error_str = str(exc).lower()
             logger.warning("generate_structured_json Modell %s fehlgeschlagen: %s", model_name, exc)
-            if "503" in error_str or "over capacity" in error_str or "404" in error_str or "model not found" in error_str:
-                continue
-            break
+            continue
 
     logger.error("generate_structured_json: Alle Modelle fehlgeschlagen")
     return ""
@@ -397,19 +408,32 @@ async def generate_structured_json_stream(system_prompt: str, user_message: str)
     success = False
 
     for index, model_name in enumerate(model_list):
+        # NEU: full_reply bei jedem neuen Modellversuch zuruecksetzen. Vorher
+        # blieb bei einem Fallback (z.B. weil das erste Modell MITTEN im
+        # Stream abbrach) der bereits empfangene Teiltext des vorigen Modells
+        # stehen und wurde mit dem kompletten Text des naechsten Modells
+        # zusammengehaengt -> garantiert kaputtes/unvollstaendiges JSON, das
+        # dann als "duerftiges Profil" beim Nutzer ankam.
+        full_reply = ""
         try:
-            stream = await asyncio.to_thread(
-                client.chat.completions.create,
-                model=model_name,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=4096,
-                top_p=0.9,
-                stream=True,
+            stream = await asyncio.wait_for(
+                asyncio.to_thread(
+                    client.chat.completions.create,
+                    model=model_name,
+                    messages=messages,
+                    temperature=0.1,
+                    max_tokens=4096,
+                    top_p=0.9,
+                    stream=True,
+                ),
+                timeout=60.0,
             )
             iterator = iter(stream)
             while True:
-                chunk = await asyncio.to_thread(lambda it=iterator: next(it, None))
+                chunk = await asyncio.wait_for(
+                    asyncio.to_thread(lambda it=iterator: next(it, None)),
+                    timeout=30.0,
+                )
                 if chunk is None:
                     break
                 delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
@@ -417,17 +441,18 @@ async def generate_structured_json_stream(system_prompt: str, user_message: str)
                     full_reply += delta
                     yield ("text", delta)
 
+            if not full_reply.strip():
+                logger.warning("generate_structured_json_stream Modell %s lieferte leeren Stream", model_name)
+                continue
+
             if index > 0:
                 logger.info("✅ generate_structured_json_stream Fallback auf %s", model_name)
             success = True
             break
 
         except Exception as exc:
-            error_str = str(exc).lower()
             logger.warning("generate_structured_json_stream Modell %s: %s", model_name, exc)
-            if "503" in error_str or "over capacity" in error_str or "404" in error_str or "model not found" in error_str:
-                continue
-            break
+            continue
 
     if not success:
         logger.error("generate_structured_json_stream: Alle Modelle fehlgeschlagen")
