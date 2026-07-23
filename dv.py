@@ -36,16 +36,32 @@ def get_mime(file_path: str) -> str:
 
 
 # ====================== LESEN ======================
-def _ocr_pdf_fallback(file_path: str, num_pages: int, max_pages: int = 10, dpi: int = 150) -> str:
+def _ocr_pdf_fallback(file_path: str, num_pages: int, max_pages: int = 6, dpi: int = 120,
+                       min_chars_early_exit: int = 3500, progress: dict = None) -> str:
     """OCR-Fallback fuer PDFs ohne (verwertbaren) Text-Layer, z.B. eingescannte
     Bewerbungsmappen. Bewusst limitiert (max_pages, niedrige DPI), damit das
-    auch auf schwacher/1-Kern-Hardware in vertretbarer Zeit durchlaeuft - die
-    eigentlichen Lebenslauf-Seiten stehen bei Bewerbungsmappen ohnehin fast
-    immer am Anfang der Datei; nachfolgende Zeugnisse/Zertifikate sind fuer
-    die reine Profil-Extraktion zweitrangig. Bei fehlendem Tesseract/Sprachpaket
-    wird sauber degradiert (kein Crash) - der Aufrufer behandelt eine leere
-    Rueckgabe dann als "kein Text erkennbar".
+    auch auf schwacher/gedrosselter Free-Tier-CPU in vertretbarer Zeit
+    durchlaeuft - die eigentlichen Lebenslauf-Seiten stehen bei Bewerbungs-
+    mappen ohnehin fast immer am Anfang der Datei; nachfolgende Zeugnisse/
+    Zertifikate sind fuer die reine Profil-Extraktion zweitrangig.
+
+    NEU: Seite fuer Seite statt alles-auf-einmal, mit zwei Verbesserungen:
+    - Early-Exit: sobald genug Text zusammengekommen ist (min_chars_early_exit),
+      wird abgebrochen statt stur alle max_pages abzuarbeiten - spart auf
+      langsamer Hardware oft die Haelfte der Zeit.
+    - progress (optional, geteiltes dict): wird nach JEDER Seite aktualisiert.
+      Bricht der Aufrufer wegen eines Gesamt-Timeouts ab, kann er trotzdem
+      den bereits erkannten Text aus 'progress' weiterverwenden statt bei
+      Null anzufangen ("in Haeppchen arbeiten" statt alles-oder-nichts).
+
+    Bei fehlendem Tesseract/Sprachpaket wird sauber degradiert (kein Crash) -
+    der Aufrufer behandelt eine leere Rueckgabe dann als "kein Text erkennbar".
     """
+    if progress is None:
+        progress = {}
+    progress.setdefault("text", "")
+    progress.setdefault("pages_done", 0)
+
     try:
         import pytesseract
     except Exception as exc:
@@ -67,39 +83,49 @@ def _ocr_pdf_fallback(file_path: str, num_pages: int, max_pages: int = 10, dpi: 
     try:
         doc = fitz.open(file_path)
         pages_to_scan = min(num_pages, max_pages, len(doc))
-        images = []
-        for i in range(pages_to_scan):
-            pix = doc[i].get_pixmap(dpi=dpi)
-            images.append(Image.open(_io.BytesIO(pix.tobytes("png"))))
-        doc.close()
     except Exception as exc:
-        logger.warning("OCR-Fallback: PDF->Bild-Konvertierung fehlgeschlagen: %s", exc)
+        logger.warning("OCR-Fallback: PDF konnte nicht geoeffnet werden: %s", exc)
         return ""
 
-    # Deutsch+Englisch bevorzugt (deutsche Bewerbungsunterlagen), faellt aber
-    # sauber auf Englisch/Standard zurueck, falls das deutsche Tesseract-
-    # Sprachpaket (tesseract-ocr-deu) auf dem Server nicht installiert ist.
     lang_attempts = ["deu+eng", "eng", None]
     texts = []
-    for img in images:
-        page_text = ""
-        for lang in lang_attempts:
+    try:
+        for i in range(pages_to_scan):
             try:
-                page_text = pytesseract.image_to_string(img, lang=lang) if lang else pytesseract.image_to_string(img)
-                break
+                pix = doc[i].get_pixmap(dpi=dpi)
+                img = Image.open(_io.BytesIO(pix.tobytes("png")))
             except Exception as exc:
-                logger.debug("OCR Sprachpaket '%s' fehlgeschlagen: %s", lang, exc)
+                logger.warning("OCR-Fallback: Seite %d konnte nicht gerendert werden: %s", i + 1, exc)
                 continue
-        texts.append(page_text)
 
-    combined = "\n".join(texts).strip()
+            page_text = ""
+            for lang in lang_attempts:
+                try:
+                    page_text = pytesseract.image_to_string(img, lang=lang) if lang else pytesseract.image_to_string(img)
+                    break
+                except Exception as exc:
+                    logger.debug("OCR Sprachpaket '%s' fehlgeschlagen: %s", lang, exc)
+                    continue
+
+            texts.append(page_text)
+            progress["pages_done"] = i + 1
+            progress["text"] = "\n".join(texts).strip()
+
+            if len(progress["text"]) >= min_chars_early_exit:
+                logger.info("OCR-Fallback: Early-Exit nach %d/%d Seiten (%d Zeichen erreicht)",
+                             i + 1, pages_to_scan, len(progress["text"]))
+                break
+    finally:
+        doc.close()
+
+    combined = progress["text"]
     if combined:
-        logger.info("OCR-Fallback erfolgreich: %d/%d Seiten gescannt, %d Zeichen erkannt",
-                     pages_to_scan, num_pages, len(combined))
+        logger.info("OCR-Fallback erfolgreich: %d Seiten gescannt, %d Zeichen erkannt",
+                     progress["pages_done"], len(combined))
     return combined
 
 
-def extract_content(file_path: str, max_chars: int = 12000) -> str:
+def extract_content(file_path: str, max_chars: int = 12000, ocr_progress: dict = None) -> str:
     mime = get_mime(file_path)
     name = os.path.basename(file_path)
 
@@ -131,7 +157,7 @@ def extract_content(file_path: str, max_chars: int = 12000) -> str:
             # langsam; die eigentlichen Lebenslauf-Seiten stehen ohnehin am
             # Anfang der Datei, Zeugnisse/Zertifikate danach sind sekundaer).
             if len(text.strip()) < 200:
-                ocr_text = _ocr_pdf_fallback(file_path, num_pages)
+                ocr_text = _ocr_pdf_fallback(file_path, num_pages, progress=ocr_progress)
                 if ocr_text:
                     text = ocr_text
                     return (f"📄 PDF '{name}' ({num_pages} Seiten, per OCR erkannt "

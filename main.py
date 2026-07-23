@@ -3080,6 +3080,13 @@ async def jobqueen_cv_stream(request: Request):
 
             tmp_path = None
             extracted_text = ""
+            # NEU: geteiltes Fortschritts-Objekt - der OCR-Fallback in dv.py
+            # aktualisiert es nach JEDER gescannten Seite. Reisst das Gesamt-
+            # Timeout trotzdem, wird NICHT alles verworfen: die bereits
+            # erkannten Seiten werden stattdessen fuer eine "Teilanalyse"
+            # verwendet (besser ein unvollstaendiges, aber echtes Profil als
+            # ein kompletter Fehlschlag nach 2+ Minuten Wartezeit).
+            ocr_progress = {}
             try:
                 try:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -3088,26 +3095,45 @@ async def jobqueen_cv_stream(request: Request):
                     from dv import extract_content
 
                     extract_task = asyncio.create_task(
-                        asyncio.to_thread(extract_content, tmp_path, 30000)
+                        asyncio.to_thread(extract_content, tmp_path, 30000, ocr_progress)
                     )
                     waited = 0.0
+                    used_partial = False
                     while True:
                         try:
                             extracted_text = await asyncio.wait_for(asyncio.shield(extract_task), timeout=8.0)
                             break
                         except asyncio.TimeoutError:
                             waited += 8.0
-                            # NEU: Timeout-Budget angehoben (90s -> 150s), da der
-                            # OCR-Fallback fuer gescannte PDFs (siehe dv.py) auf
-                            # schwacher Hardware pro Seite mehrere Sekunden braucht.
-                            if waited >= 150.0:
+                            # NEU: Timeout-Budget grosszuegig (240s), da SSE-Heart-
+                            # beats die Verbindung ohnehin offenhalten - der
+                            # limitierende Faktor ist die (ggf. gedrosselte
+                            # Free-Tier-)CPU fuer OCR, nicht ein Proxy-Timeout.
+                            if waited >= 240.0:
                                 extract_task.cancel()
-                                logger.error("CV-Stream: Extraktion Timeout (>150s) fuer %s", filename)
-                                yield f"data: {json.dumps({'error': 'Die Datei konnte nicht rechtzeitig verarbeitet werden (Timeout). Bitte eine kleinere/einfachere PDF-Datei versuchen.'}, ensure_ascii=False)}\n\n"
+                                partial = (ocr_progress.get("text") or "").strip()
+                                if len(partial) >= 250:
+                                    logger.warning(
+                                        "CV-Stream: Timeout nach %d erkannten Seiten - "
+                                        "verwende Teilergebnis (%d Zeichen) fuer %s",
+                                        ocr_progress.get("pages_done", 0), len(partial), filename,
+                                    )
+                                    extracted_text = (
+                                        f"📄 PDF '{filename}' (Teilanalyse - nur die ersten "
+                                        f"{ocr_progress.get('pages_done', 0)} Seite(n) erkannt, "
+                                        f"Rest hat das Zeitbudget ueberschritten):\n{partial}"
+                                    )
+                                    used_partial = True
+                                    break
+                                logger.error("CV-Stream: Extraktion Timeout (>240s) fuer %s", filename)
+                                yield f"data: {json.dumps({'error': 'Die Datei konnte nicht rechtzeitig verarbeitet werden (Timeout), und es liegt noch kein verwertbares Teilergebnis vor. Bitte eine kleinere/kuerzere PDF-Datei versuchen oder eine Text-PDF statt eines Scans hochladen.'}, ensure_ascii=False)}\n\n"
                                 return
                             # SSE-Kommentarzeile: haelt die Verbindung "lebendig",
                             # wird vom Frontend-Parser ignoriert (startet nicht mit "data: ")
                             yield ": ping\n\n"
+                    if used_partial:
+                        _partial_hint = f"[Hinweis: nur Teil der Datei erkannt - {ocr_progress.get('pages_done', 0)} Seite(n)]"
+                        yield f"data: {json.dumps({'chunk': _partial_hint}, ensure_ascii=False)}\n\n"
                 finally:
                     if tmp_path and os.path.exists(tmp_path):
                         try:
@@ -3254,12 +3280,29 @@ async def jobqueen_cv_analyze(request: Request):
             from dv import extract_content
             # Siehe cv_stream: blockierender Call -> in Thread auslagern + Timeout,
             # sonst friert die einzige Event-Loop ein und der vorgeschaltete Proxy
-            # liefert 502 fuer alle parallelen Anfragen. Timeout angehoben (auf
-            # 150s), da der OCR-Fallback fuer gescannte PDFs mehrere Sekunden
-            # pro Seite braucht.
-            extracted_text = await asyncio.wait_for(
-                asyncio.to_thread(extract_content, tmp_path, 30000), timeout=150.0
-            )
+            # liefert 502 fuer alle parallelen Anfragen. Kein SSE hier -> kein
+            # Heartbeat moeglich, daher moderateres Timeout als beim Stream-Endpoint;
+            # bei Timeout trotzdem Teilergebnis aus ocr_progress nutzen, falls vorhanden.
+            ocr_progress = {}
+            try:
+                extracted_text = await asyncio.wait_for(
+                    asyncio.to_thread(extract_content, tmp_path, 30000, ocr_progress), timeout=150.0
+                )
+            except asyncio.TimeoutError:
+                partial = (ocr_progress.get("text") or "").strip()
+                if len(partial) >= 250:
+                    logger.warning(
+                        "jobqueen_cv_analyze: Timeout nach %d erkannten Seiten - "
+                        "verwende Teilergebnis (%d Zeichen) fuer %s",
+                        ocr_progress.get("pages_done", 0), len(partial), filename,
+                    )
+                    extracted_text = (
+                        f"📄 PDF '{filename}' (Teilanalyse - nur die ersten "
+                        f"{ocr_progress.get('pages_done', 0)} Seite(n) erkannt, "
+                        f"Rest hat das Zeitbudget ueberschritten):\n{partial}"
+                    )
+                else:
+                    raise
 
             # NEU: KRITISCHE Sicherung gegen Halluzination - siehe cv_stream fuer
             # ausfuehrliche Begruendung. Ohne verwertbaren Text darf das LLM
@@ -3354,7 +3397,7 @@ async def jobqueen_cv_analyze(request: Request):
                     pass
 
     except asyncio.TimeoutError:
-        logger.error("jobqueen_cv_analyze: Datei-Extraktion Timeout (>45s)")
+        logger.error("jobqueen_cv_analyze: Datei-Extraktion Timeout (>150s, kein verwertbares Teilergebnis)")
         return JSONResponse(
             {"error": "Die Datei konnte nicht rechtzeitig verarbeitet werden (Timeout). "
                       "Bitte eine kleinere/einfachere PDF-Datei versuchen."},
