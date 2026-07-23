@@ -657,3 +657,192 @@ def create_cv_excel(profile: dict) -> BytesIO:
     wb.save(buf)
     buf.seek(0)
     return buf
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BEWERBUNGSANSCHREIBEN – professionell formatiertes DOCX + PDF
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# `letter` erwartet folgendes Dict-Schema (siehe main.py /coverletter/draft):
+#   {
+#     "subject": "Bewerbung als ...",
+#     "salutation": "Sehr geehrte Damen und Herren,",
+#     "paragraphs": ["Absatz 1 ...", "Absatz 2 ...", ...],
+#     "closing": "Mit freundlichen Gruessen",
+#     "signature_name": "Max Mustermann",
+#   }
+#
+# `sender` (optional, alles darf leer/None sein):
+#   {"name": "...", "address": "...", "email": "...", "phone": "..."}
+#
+# `recipient` (optional):
+#   {"company": "...", "attention": "...", "address": "..."}
+
+
+def _cl_field(d: dict, key: str, default: str = "") -> str:
+    val = (d or {}).get(key)
+    return str(val).strip() if val else default
+
+
+def create_cover_letter_docx(letter: dict, sender: dict = None, recipient: dict = None,
+                              date_str: str = "") -> BytesIO:
+    """Erstellt ein professionell formatiertes Bewerbungsanschreiben als DOCX
+    (DIN-5008-angelehntes Layout: Absenderzeile, Datum rechtsbuendig, Betreff
+    fett, Anrede, Fliesstext-Absaetze, Grussformel)."""
+    from docx.shared import Pt, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+    sender = sender or {}
+    recipient = recipient or {}
+
+    doc = Document()
+
+    section = doc.sections[0]
+    section.top_margin = Cm(2.5)
+    section.bottom_margin = Cm(2.0)
+    section.left_margin = Cm(2.5)
+    section.right_margin = Cm(2.0)
+
+    style = doc.styles["Normal"]
+    style.font.name = "Calibri"
+    style.font.size = Pt(11)
+
+    s_name = _cl_field(sender, "name")
+    s_addr = _cl_field(sender, "address")
+    s_mail = _cl_field(sender, "email")
+    s_phone = _cl_field(sender, "phone")
+    if s_name or s_addr or s_mail or s_phone:
+        for line in filter(None, [s_name, s_addr, s_mail, s_phone]):
+            p = doc.add_paragraph(line)
+            p.runs[0].font.size = Pt(9.5)
+            p.paragraph_format.space_after = Pt(0)
+        doc.add_paragraph().paragraph_format.space_after = Pt(0)
+
+    r_company = _cl_field(recipient, "company")
+    r_att = _cl_field(recipient, "attention")
+    r_addr = _cl_field(recipient, "address")
+
+    date_p = doc.add_paragraph(date_str)
+    date_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    date_p.paragraph_format.space_after = Pt(12)
+
+    if r_company or r_att or r_addr:
+        for line in filter(None, [r_company, r_att, r_addr]):
+            p = doc.add_paragraph(line)
+            p.paragraph_format.space_after = Pt(0)
+        doc.add_paragraph().paragraph_format.space_after = Pt(0)
+
+    subject = _cl_field(letter, "subject", "Bewerbung")
+    subj_p = doc.add_paragraph()
+    subj_run = subj_p.add_run(subject)
+    subj_run.bold = True
+    subj_p.paragraph_format.space_after = Pt(14)
+
+    salutation = _cl_field(letter, "salutation", "Sehr geehrte Damen und Herren,")
+    sal_p = doc.add_paragraph(salutation)
+    sal_p.paragraph_format.space_after = Pt(10)
+
+    paragraphs = letter.get("paragraphs") or []
+    if isinstance(paragraphs, str):
+        paragraphs = [p.strip() for p in paragraphs.split("\n\n") if p.strip()]
+    for para_text in paragraphs:
+        p = doc.add_paragraph(para_text)
+        p.paragraph_format.space_after = Pt(10)
+        p.paragraph_format.line_spacing = 1.15
+
+    closing = _cl_field(letter, "closing", "Mit freundlichen Gruessen")
+    doc.add_paragraph().paragraph_format.space_after = Pt(0)
+    close_p = doc.add_paragraph(closing)
+    close_p.paragraph_format.space_after = Pt(30)
+
+    sig_name = _cl_field(letter, "signature_name", s_name)
+    if sig_name:
+        doc.add_paragraph(sig_name)
+
+    buf = BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def create_cover_letter_pdf(letter: dict, sender: dict = None, recipient: dict = None,
+                             date_str: str = "") -> BytesIO:
+    """Erstellt dasselbe Anschreiben als sauber umbrochenes PDF (reportlab
+    Platypus statt Zeile-fuer-Zeile-Canvas -> echter Fliesstext-Umbruch,
+    saubere Seitenumbrueche bei laengeren Texten)."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_RIGHT
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from xml.sax.saxutils import escape as _xml_escape
+
+    sender = sender or {}
+    recipient = recipient or {}
+
+    buf = BytesIO()
+    docpdf = SimpleDocTemplate(
+        buf, pagesize=A4,
+        topMargin=2.5 * cm, bottomMargin=2.0 * cm,
+        leftMargin=2.5 * cm, rightMargin=2.0 * cm,
+    )
+
+    base_styles = getSampleStyleSheet()
+    style_small = ParagraphStyle("clSmall", parent=base_styles["Normal"],
+                                  fontName="Helvetica", fontSize=9.5, leading=13)
+    style_normal = ParagraphStyle("clNormal", parent=base_styles["Normal"],
+                                   fontName="Helvetica", fontSize=11, leading=16,
+                                   spaceAfter=10)
+    style_right = ParagraphStyle("clRight", parent=style_normal, alignment=TA_RIGHT,
+                                  spaceAfter=14)
+    style_subject = ParagraphStyle("clSubject", parent=style_normal, fontName="Helvetica-Bold",
+                                    spaceAfter=14)
+
+    story = []
+
+    def esc(t: str) -> str:
+        return _xml_escape(t or "").replace("\n", "<br/>")
+
+    s_name = _cl_field(sender, "name")
+    s_addr = _cl_field(sender, "address")
+    s_mail = _cl_field(sender, "email")
+    s_phone = _cl_field(sender, "phone")
+    if s_name or s_addr or s_mail or s_phone:
+        block = "<br/>".join(esc(x) for x in [s_name, s_addr, s_mail, s_phone] if x)
+        story.append(Paragraph(block, style_small))
+        story.append(Spacer(1, 16))
+
+    story.append(Paragraph(esc(date_str), style_right))
+
+    r_company = _cl_field(recipient, "company")
+    r_att = _cl_field(recipient, "attention")
+    r_addr = _cl_field(recipient, "address")
+    if r_company or r_att or r_addr:
+        block = "<br/>".join(esc(x) for x in [r_company, r_att, r_addr] if x)
+        story.append(Paragraph(block, style_normal))
+        story.append(Spacer(1, 10))
+
+    subject = _cl_field(letter, "subject", "Bewerbung")
+    story.append(Paragraph(esc(subject), style_subject))
+
+    salutation = _cl_field(letter, "salutation", "Sehr geehrte Damen und Herren,")
+    story.append(Paragraph(esc(salutation), style_normal))
+
+    paragraphs = letter.get("paragraphs") or []
+    if isinstance(paragraphs, str):
+        paragraphs = [p.strip() for p in paragraphs.split("\n\n") if p.strip()]
+    for para_text in paragraphs:
+        story.append(Paragraph(esc(para_text), style_normal))
+
+    closing = _cl_field(letter, "closing", "Mit freundlichen Gruessen")
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(esc(closing), style_normal))
+
+    sig_name = _cl_field(letter, "signature_name", s_name)
+    if sig_name:
+        story.append(Spacer(1, 30))
+        story.append(Paragraph(esc(sig_name), style_normal))
+
+    docpdf.build(story)
+    buf.seek(0)
+    return buf

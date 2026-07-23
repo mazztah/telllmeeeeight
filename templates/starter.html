@@ -799,6 +799,109 @@ async function callChat(message) {
   return d.reply || 'Keine Antwort.';
 }
 
+/* ─── ANSCHREIBEN (kontextsensitiv: Job + CV-Unterlagen falls vorhanden) ── */
+function _clRenderLetterHtml(letter, jobKeyEnc, hasCv) {
+  const paras = Array.isArray(letter.paragraphs) ? letter.paragraphs : [];
+  const body = paras.map(p => `<p style="margin:0 0 10px">${escHtml(p)}</p>`).join('');
+  const hint = hasCv
+    ? `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:8px">📎 Abgestimmt auf deine hochgeladenen Bewerbungsunterlagen</div>`
+    : `<div style="font-size:0.68rem;color:var(--muted);margin-bottom:8px">ℹ️ Ohne CV-Upload erstellt – lade deinen Lebenslauf hoch für ein persönlicheres Anschreiben</div>`;
+  return hint
+    + `<div style="font-weight:700;margin-bottom:6px">${escHtml(letter.subject||'Bewerbung')}</div>`
+    + `<p style="margin:0 0 10px">${escHtml(letter.salutation||'Sehr geehrte Damen und Herren,')}</p>`
+    + body
+    + `<p style="margin:0">${escHtml(letter.closing||'Mit freundlichen Grüßen')}</p>`
+    + (letter.signature_name ? `<p style="margin:0">${escHtml(letter.signature_name)}</p>` : '')
+    + `<div style="margin-top:12px">`
+    + `<span class="job-cl-btn" onclick="exportCoverLetter('${jobKeyEnc}')">📄 Als Word &amp; PDF senden</span>`
+    + `</div>`;
+}
+
+async function requestCoverLetter(jobKeyEnc) {
+  const jobKey = decodeURIComponent(jobKeyEnc);
+  const job = allJobsIndex[jobKey];
+  if (!job) { addMsgBoth('⚠️ Job nicht gefunden. Bitte erneut suchen.', false); return; }
+
+  const target = isMobile() ? 'mobile' : 'desktop';
+  if (isMobile()) openChat();
+
+  addMsgBoth(`✍️ Erstelle Anschreiben für <b>${escHtml(job.title||'')}</b> bei <b>${escHtml(job.company||'')}</b>…`, true);
+  showTyping(target);
+
+  try {
+    const res = await fetch('/api/jobqueen/coverletter/draft', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ chat_id: 'jobqueen', job })
+    });
+    removeTyping(target);
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || ('HTTP ' + res.status));
+
+    coverLettersIndex[jobKey] = d.letter;
+    addMsgBoth(_clRenderLetterHtml(d.letter, jobKeyEnc, d.has_cv), false);
+  } catch (e) {
+    removeTyping(target);
+    addMsgBoth('❌ Anschreiben-Erstellung fehlgeschlagen: ' + escHtml(e.message), false);
+  }
+}
+
+async function exportCoverLetter(jobKeyEnc) {
+  const jobKey = decodeURIComponent(jobKeyEnc);
+  const job = allJobsIndex[jobKey];
+  const letter = coverLettersIndex[jobKey];
+  if (!job || !letter) { addMsgBoth('⚠️ Kein Anschreiben zum Exportieren gefunden.', false); return; }
+
+  const tgChatId = getTgChatId();
+  if (!tgChatId) {
+    addMsgBoth(
+      `⚠️ <b>Telegram-Chat konnte nicht erkannt werden.</b><br>`
+      +`Bitte öffne JobQueen über den Bot-Button in Telegram, damit ich dir die Dateien direkt senden kann.`,
+      false
+    );
+  }
+
+  addMsgBoth('📤 Erstelle Word- &amp; PDF-Dokument…', false);
+
+  try {
+    const res = await fetch('/api/jobqueen/coverletter/export', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        chat_id: 'jobqueen',
+        tg_chat_id: tgChatId ? String(tgChatId) : null,
+        job, letter
+      })
+    });
+
+    const ctype = res.headers.get('Content-Type') || '';
+    if (ctype.includes('application/json')) {
+      const d = await res.json();
+      if (!res.ok || d.error) throw new Error(d.error || ('HTTP ' + res.status));
+      if (d.telegram_sent === false) {
+        addMsgBoth(
+          `⚠️ <b>Telegram-Versand fehlgeschlagen:</b><br>`
+          +`<span style='font-size:0.8rem;color:var(--muted)'>${escHtml(d.telegram_error||'Unbekannter Fehler')}</span>`,
+          false
+        );
+        return;
+      }
+      addMsgBoth('✅ <b>Word- &amp; PDF-Anschreiben wurden in deinen Telegram-Chat gesendet!</b> 📬', false);
+    } else {
+      // Binary-Fallback (kein tg_chat_id) → Browser-Download anstossen
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'Anschreiben.docx';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      addMsgBoth('✅ Word-Dokument heruntergeladen.', false);
+    }
+  } catch (e) {
+    addMsgBoth('❌ Export fehlgeschlagen: ' + escHtml(e.message), false);
+  }
+}
+
 async function sendMsg(target) {
   const inp = getInput(target);
   if (!inp) return;
@@ -831,6 +934,7 @@ let lastLocation = '';
 let lastJobs     = [];
 let allJobsIndex = {};   // url/id → job (akkumuliert über alle Suchen)
 let queryHistory = [];   // [{query, platform, location}]
+let coverLettersIndex = {}; // jobKey → zuletzt generiertes Anschreiben-JSON (fuer Export-Button)
 
 // Echte Telegram-Chat-ID (für Datei-Versand via Bot) – mehrere Quellen probiert
 function getTgChatId() {
@@ -1034,8 +1138,8 @@ function renderJobs(jobs, sourceName) {
     const badge=src?`<span style="font-size:0.68rem;padding:2px 6px;border-radius:5px;background:rgba(212,175,55,0.14);color:var(--accent);margin-left:6px">${src}</span>`:""
     const dAge=j.date?' · '+dateAgeLabel(j.date):'';
     const applyBtn=j.url?`<a class="job-apply-btn" href="${escHtml(j.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 Zur Stelle →</a>`:'';
-    const clT=escHtml(j.title||'').replace(/'/g,"\\\\'"), clC=escHtml(j.company||'').replace(/'/g,"\\\\'"), clL=escHtml(j.location||'').replace(/'/g,"\\\\'");
-    const clBtn=`<span class="job-cl-btn" onclick="event.stopPropagation();chatMsg('Erstelle Anschreiben für: ${clT} bei ${clC} in ${clL}')">&#9997;&#65039; Anschreiben</span>`;
+    const jKeyEnc=encodeURIComponent(jKey);
+    const clBtn=`<span class="job-cl-btn" onclick="event.stopPropagation();requestCoverLetter('${jKeyEnc}')">&#9997;&#65039; Anschreiben</span>`;
     const sk=jKey.replace(/"/g,'&quot;'), cbId='cb_'+jKey.replace(/[^a-z0-9]/gi,'_').slice(0,28);
     const cbHtml=`<label class="job-cb-wrap" onclick="event.stopPropagation()" title="In Excel aufnehmen" `
       +`style="position:absolute;top:10px;right:10px;z-index:3;cursor:pointer;display:flex;align-items:center;gap:4px;background:var(--s2);border-radius:6px;padding:3px 7px;border:1px solid var(--border)">`

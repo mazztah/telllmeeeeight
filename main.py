@@ -2786,6 +2786,227 @@ async def jobqueen_coverletters(request: Request):
         return JSONResponse({"error": str(e)[:500]}, status_code=500)
 
 
+def _cl_job_key(job: dict) -> str:
+    job = job or {}
+    return (job.get("url") or job.get("id") or job.get("title") or "job").strip()
+
+
+def _cl_sanitize_filename(text: str, max_len: int = 40) -> str:
+    import re as _re_fn
+    text = (text or "").strip()
+    text = _re_fn.sub(r"[^A-Za-z0-9äöüÄÖÜß _.-]", "", text).replace(" ", "_")
+    return text[:max_len] or "Anschreiben"
+
+
+@app.post("/api/jobqueen/coverletter/draft")
+async def jobqueen_coverletter_draft(request: Request):
+    """Generiert EIN einzelnes, auf die Stellenbeschreibung UND (falls vorhanden)
+    die hochgeladenen Bewerbungsunterlagen (CV) abgestimmtes Anschreiben.
+    Nutzt Profil + CV-Rohtext aus dem Session-State (kein erneuter Upload noetig),
+    liefert strukturiertes JSON zurueck (Betreff/Anrede/Absaetze/Grussformel),
+    das im Chat gerendert wird und Grundlage fuer den Word/PDF-Export ist.
+    """
+    try:
+        data = await request.json()
+        job = data.get("job") or {}
+        chat_id = (data.get("chat_id") or "jobqueen").strip() or "jobqueen"
+        extra = (data.get("extra_instructions") or "").strip()
+
+        if not job.get("title") and not job.get("company"):
+            return JSONResponse({"error": "job (title/company) fehlt"}, status_code=400)
+
+        from bot_state import jobqueen_state
+        state = jobqueen_state.setdefault(chat_id, {})
+        profile = state.get("profile") or {}
+        cv_raw_text = state.get("cv_raw_text") or ""
+        has_cv = bool(profile or cv_raw_text)
+
+        job_title = (job.get("title") or "").strip()
+        job_company = (job.get("company") or "").strip()
+        job_location = (job.get("location") or "").strip()
+        job_desc = (job.get("description_snippet") or job.get("description") or "").strip()
+
+        profile_hint = json.dumps({
+            "name": profile.get("name"),
+            "skills": profile.get("skills"),
+            "languages": profile.get("languages"),
+            "experience_years": profile.get("experience_years"),
+            "strengths": [s.get("strength") for s in (profile.get("strengths") or [])[:8] if isinstance(s, dict)],
+        }, ensure_ascii=False) if profile else "{}"
+
+        from bot_ai import generate_structured_json
+        import re as _re_cld
+
+        _cl_system = (
+            "Du bist ein erstklassiger Karriereberater und Bewerbungsanschreiben-Texter. "
+            "Du schreibst individuelle, ueberzeugende deutsche Bewerbungsanschreiben, "
+            "niemals generische Textbausteine. Antworte AUSSCHLIESSLICH mit gueltigem JSON, "
+            "kein Fliesstext, keine Markdown-Codeblocks."
+        )
+
+        cv_block = (
+            f"AUSZUG AUS DEN HOCHGELADENEN BEWERBUNGSUNTERLAGEN (Lebenslauf, Originaltext):\n{cv_raw_text[:6000]}\n\n"
+            if cv_raw_text else
+            "Es wurden KEINE Bewerbungsunterlagen (Lebenslauf) hochgeladen. Schreibe ein "
+            "ueberzeugendes, aber bewusst allgemeiner gehaltenes Anschreiben basierend nur auf "
+            "der Stellenbeschreibung; erfinde KEINE konkreten Qualifikationen, Firmen oder Zahlen.\n\n"
+        )
+
+        _cl_user = (
+            "Erstelle EIN massgeschneidertes Bewerbungsanschreiben auf Deutsch fuer folgende Stelle:\n"
+            f"- Position: {job_title}\n- Unternehmen: {job_company}\n- Ort: {job_location}\n"
+            f"- Stellenbeschreibung/Auszug: {job_desc[:1500]}\n\n"
+            f"PROFIL DES BEWERBERS (verdichtet): {profile_hint}\n\n"
+            f"{cv_block}"
+            + (f"Zusaetzliche Wuensche des Nutzers: {extra}\n\n" if extra else "")
+            + "Gib EXAKT folgendes JSON-Schema zurueck (nur JSON):\n"
+            "{\n"
+            '  "subject": "Bewerbung als ... (praezise, mit Positions-Bezug, ggf. Referenznummer)",\n'
+            '  "salutation": "Sehr geehrte Damen und Herren," (oder konkreter Name falls aus Text ableitbar),\n'
+            '  "paragraphs": ["Absatz 1: Einstieg + Bezug zur Stelle", "Absatz 2: passende Qualifikationen/Erfahrung mit konkreten Belegen aus dem Profil/CV", "Absatz 3: Motivation fuer genau dieses Unternehmen", "Absatz 4: Abschluss, Verfuegbarkeit, Gesprächswunsch"],\n'
+            '  "closing": "Mit freundlichen Gruessen",\n'
+            '  "signature_name": "Name aus dem Profil, falls vorhanden, sonst leer"\n'
+            "}\n\n"
+            "Regeln: 3-5 Absaetze, insgesamt max. ca. 320 Woerter, keine Floskeln-Ueberladung, "
+            "konkret und auf die Stelle bezogen, keine erfundenen Fakten."
+        )
+
+        reply = await generate_structured_json(_cl_system, _cl_user)
+        letter = {}
+        if reply:
+            cleaned = _re_cld.sub(r'```(?:json)?\s*|\s*```', '', reply).strip()
+            s = cleaned.find('{')
+            e = cleaned.rfind('}')
+            if s != -1 and e != -1:
+                try:
+                    letter = json.loads(cleaned[s:e + 1])
+                except Exception:
+                    letter = {}
+
+        if not letter or not letter.get("paragraphs"):
+            return JSONResponse({"error": "Anschreiben konnte nicht generiert werden. Bitte erneut versuchen."},
+                                 status_code=502)
+
+        job_key = _cl_job_key(job)
+        state.setdefault("cover_letters", {})[job_key] = {
+            "letter": letter, "job": job, "generated_at": datetime.now().isoformat(),
+        }
+
+        return JSONResponse({
+            "success": True,
+            "job_key": job_key,
+            "letter": letter,
+            "has_cv": has_cv,
+        })
+
+    except Exception as e:
+        logger.error("jobqueen_coverletter_draft Fehler: %s", e, exc_info=True)
+        return JSONResponse({"error": str(e)[:500]}, status_code=500)
+
+
+@app.post("/api/jobqueen/coverletter/export")
+async def jobqueen_coverletter_export(request: Request):
+    """Erstellt aus einem (zuvor generierten) Anschreiben ein perfekt formatiertes
+    DOCX + PDF und sendet beides DIREKT in den Telegram-Chat (gleiches Muster wie
+    /api/jobqueen/excel). Faellt ohne tg_chat_id auf einen Binary-Download (DOCX)
+    zurueck (z.B. zum Testen ausserhalb von Telegram).
+    """
+    try:
+        data = await request.json()
+        chat_id = (data.get("chat_id") or "jobqueen").strip() or "jobqueen"
+        tg_chat_id = data.get("tg_chat_id")
+        job = data.get("job") or {}
+        letter = data.get("letter") or {}
+        sender_override = data.get("sender") or {}
+
+        from bot_state import jobqueen_state
+        state = jobqueen_state.setdefault(chat_id, {})
+
+        job_key = _cl_job_key(job)
+        if not letter or not letter.get("paragraphs"):
+            stored = (state.get("cover_letters") or {}).get(job_key)
+            if stored:
+                letter = stored.get("letter") or {}
+                job = job or stored.get("job") or {}
+
+        if not letter or not letter.get("paragraphs"):
+            return JSONResponse(
+                {"error": "Kein Anschreiben gefunden. Bitte zuerst ein Anschreiben generieren."},
+                status_code=400)
+
+        profile = state.get("profile") or {}
+        sender = {
+            "name": sender_override.get("name") or profile.get("name") or "",
+            "address": sender_override.get("address") or "",
+            "email": sender_override.get("email") or "",
+            "phone": sender_override.get("phone") or "",
+        }
+        recipient = {
+            "company": (job.get("company") or "").strip(),
+            "attention": "",
+            "address": (job.get("location") or "").strip(),
+        }
+        date_str = datetime.now().strftime("%d.%m.%Y")
+
+        from dv import create_cover_letter_docx, create_cover_letter_pdf
+        docx_buf = create_cover_letter_docx(letter, sender=sender, recipient=recipient, date_str=date_str)
+        pdf_buf = create_cover_letter_pdf(letter, sender=sender, recipient=recipient, date_str=date_str)
+
+        company_part = _cl_sanitize_filename(job.get("company") or "Unternehmen")
+        title_part = _cl_sanitize_filename(job.get("title") or "Bewerbung")
+        fname_base = f"Anschreiben_{company_part}_{title_part}"
+        caption = (f"✍️ Anschreiben: {job.get('title') or ''} bei {job.get('company') or ''}"
+                   f"{(' · ' + job.get('location')) if job.get('location') else ''}")
+
+        if tg_chat_id:
+            try:
+                from bot_state import application as _tg_app
+                real_cid = int(str(tg_chat_id).strip())
+
+                docx_buf.seek(0)
+                await _tg_app.bot.send_document(
+                    chat_id=real_cid, document=docx_buf,
+                    filename=f"{fname_base}.docx",
+                    caption=f"📝 Word:\n{caption}",
+                )
+                pdf_buf.seek(0)
+                await _tg_app.bot.send_document(
+                    chat_id=real_cid, document=pdf_buf,
+                    filename=f"{fname_base}.pdf",
+                    caption=f"📄 PDF:\n{caption}",
+                )
+                return JSONResponse({
+                    "success": True, "telegram_sent": True, "method": "telegram",
+                    "message": "Anschreiben als Word & PDF in den Telegram-Chat gesendet.",
+                })
+            except Exception as tg_err:
+                logger.error("Telegram-Senden (Anschreiben) an chat_id=%s fehlgeschlagen: %s",
+                             tg_chat_id, tg_err, exc_info=True)
+                return JSONResponse({
+                    "success": False, "telegram_sent": False,
+                    "telegram_error": str(tg_err)[:300],
+                    "message": "Telegram-Versand fehlgeschlagen.",
+                })
+
+        # Kein tg_chat_id -> Binary-Fallback (nur DOCX, primaeres Artefakt)
+        from starlette.responses import Response as _RawResponse
+        docx_buf.seek(0)
+        content = docx_buf.getvalue()
+        return _RawResponse(
+            content=content,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f'attachment; filename="{fname_base}.docx"',
+                "Content-Length": str(len(content)),
+                "Cache-Control": "no-cache, no-store",
+            },
+        )
+
+    except Exception as e:
+        logger.error("jobqueen_coverletter_export Fehler: %s", e, exc_info=True)
+        return JSONResponse({"error": str(e)[:500]}, status_code=500)
+
+
 class CvAnalyzeRequest(BaseModel):
     chat_id: Optional[str] = None
     filename: Optional[str] = None
@@ -2903,6 +3124,11 @@ async def jobqueen_cv_stream(request: Request):
                         _jqs2[chat_id]["profile"] = profile
                         _jqs2[chat_id]["profile_uploaded_filename"] = filename
                         _jqs2[chat_id]["profile_last_analyzed_at"] = datetime.now().isoformat()
+                        # NEU: Rohtext der Bewerbungsunterlage (CV) fuer spaetere
+                        # Anschreiben-Generierung mitspeichern (nicht nur das
+                        # verdichtete Profil-JSON) - so kann das Anschreiben exakte
+                        # Formulierungen/Details aus dem Original nutzen.
+                        _jqs2[chat_id]["cv_raw_text"] = extracted_text[:12000]
                         yield f"data: {json.dumps({'done': True, 'profile': profile}, ensure_ascii=False)}\n\n"
             except Exception as exc:
                 logger.error("CV-Stream Fehler: %s", exc, exc_info=True)
@@ -3009,6 +3235,8 @@ async def jobqueen_cv_analyze(request: Request):
             jobqueen_state[chat_id]["profile"] = profile
             jobqueen_state[chat_id]["profile_uploaded_filename"] = filename
             jobqueen_state[chat_id]["profile_last_analyzed_at"] = datetime.now().isoformat()
+            # NEU: Rohtext ebenfalls speichern (siehe cv_stream fuer Begruendung)
+            jobqueen_state[chat_id]["cv_raw_text"] = extracted_text[:12000]
             jobqueen_state[chat_id].setdefault("jobs", [])
 
             return JSONResponse({"success": True, "profile": profile})
