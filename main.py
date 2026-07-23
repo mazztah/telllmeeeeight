@@ -3066,49 +3066,76 @@ async def jobqueen_cv_stream(request: Request):
         suffix = Path(filename).suffix.lower() or ".bin"
         content_bytes = await file.read()
 
-        tmp_path = None
-        extracted_text = ""
-        try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp_path = tmp.name
-                tmp.write(content_bytes)
-            from dv import extract_content
-            # WICHTIG: extract_content() ist blockierend (PyPDF2 etc.) und wuerde bei
-            # groesseren/mehrseitigen PDFs die einzige Event-Loop (workers=1) fuer
-            # mehrere Sekunden einfrieren -> Server reagiert in dieser Zeit auf GAR
-            # KEINE Anfrage (auch keine Health-Checks) -> vorgeschalteter Proxy sieht
-            # das als "haengt" und liefert 502. Deshalb in einen Thread auslagern.
-            extracted_text = await asyncio.wait_for(
-                asyncio.to_thread(extract_content, tmp_path, 30000), timeout=45.0
-            )
-        finally:
-            if tmp_path and os.path.exists(tmp_path):
-                try:
-                    os.unlink(tmp_path)
-                except Exception:
-                    pass
-
-        from bot_ai import generate_structured_json_stream
-
-        _cv_sys = (
-            "Du bist ein praeziser Lebenslauf-Analysator. "
-            "Antworte AUSSCHLIESSLICH mit gueltigem JSON. "
-            "Kein Fliesstext, keine Markdown-Codeblocks, kein ```json. "
-            "Starte direkt mit { und ende mit }."
-        )
-        _cv_usr = (
-            "Analysiere diesen Lebenslauf und gib strukturiertes JSON zurueck.\n\n"
-            'Schema: {"name": null, "skills": [], "languages": [], '
-            '"experience_years": 0, "experience_months": 0, '
-            '"experience_details": {"total_months": 0, "roles": [{"title": "", "company": "", "start": null, "end": null, "months": 0}]}, '
-            '"strengths": [{"strength": "", "evidence": "", "relevance": ""}], '
-            '"suggested_job_titles": [{"title": "", "reason": ""}], '
-            '"missing_info_questions": []}\n\n'
-            "Regeln: mind. 8 strengths mit konkretem Beleg, mind. 8 suggested_job_titles.\n\n"
-            f"Datei: {filename}\n\nEXTRAHIERTER TEXT:\n{extracted_text[:25000]}"
-        )
-
         async def _sse_gen():
+            # WICHTIG: Die StreamingResponse muss SOFORT geoeffnet werden und
+            # regelmaessig Bytes senden. Vorher lief die komplette Extraktion
+            # (bis zu 45s) VOR der Erstellung der StreamingResponse -> in dieser
+            # Zeit kamen beim Client GAR KEINE Bytes an. Viele Reverse-Proxies /
+            # der Browser selbst brechen eine Verbindung ohne jegliche Antwort
+            # nach kurzer Zeit komplett ab ("Failed to fetch", kein Statuscode).
+            # Deshalb: Verarbeitung HIER im Generator, mit periodischen
+            # SSE-Kommentarzeilen (": ping") waehrend der Extraktion, damit die
+            # Verbindung nachweislich "lebt".
+            yield ": connected\n\n"
+
+            tmp_path = None
+            extracted_text = ""
+            try:
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                        tmp_path = tmp.name
+                        tmp.write(content_bytes)
+                    from dv import extract_content
+
+                    extract_task = asyncio.create_task(
+                        asyncio.to_thread(extract_content, tmp_path, 30000)
+                    )
+                    waited = 0.0
+                    while True:
+                        try:
+                            extracted_text = await asyncio.wait_for(asyncio.shield(extract_task), timeout=8.0)
+                            break
+                        except asyncio.TimeoutError:
+                            waited += 8.0
+                            if waited >= 90.0:
+                                extract_task.cancel()
+                                logger.error("CV-Stream: Extraktion Timeout (>90s) fuer %s", filename)
+                                yield f"data: {json.dumps({'error': 'Die Datei konnte nicht rechtzeitig verarbeitet werden (Timeout). Bitte eine kleinere/einfachere PDF-Datei versuchen.'}, ensure_ascii=False)}\n\n"
+                                return
+                            # SSE-Kommentarzeile: haelt die Verbindung "lebendig",
+                            # wird vom Frontend-Parser ignoriert (startet nicht mit "data: ")
+                            yield ": ping\n\n"
+                finally:
+                    if tmp_path and os.path.exists(tmp_path):
+                        try:
+                            os.unlink(tmp_path)
+                        except Exception:
+                            pass
+            except Exception as exc:
+                logger.error("CV-Stream Extraktion Fehler: %s", exc, exc_info=True)
+                yield f"data: {json.dumps({'error': str(exc)[:200]}, ensure_ascii=False)}\n\n"
+                return
+
+            from bot_ai import generate_structured_json_stream
+
+            _cv_sys = (
+                "Du bist ein praeziser Lebenslauf-Analysator. "
+                "Antworte AUSSCHLIESSLICH mit gueltigem JSON. "
+                "Kein Fliesstext, keine Markdown-Codeblocks, kein ```json. "
+                "Starte direkt mit { und ende mit }."
+            )
+            _cv_usr = (
+                "Analysiere diesen Lebenslauf und gib strukturiertes JSON zurueck.\n\n"
+                'Schema: {"name": null, "skills": [], "languages": [], '
+                '"experience_years": 0, "experience_months": 0, '
+                '"experience_details": {"total_months": 0, "roles": [{"title": "", "company": "", "start": null, "end": null, "months": 0}]}, '
+                '"strengths": [{"strength": "", "evidence": "", "relevance": ""}], '
+                '"suggested_job_titles": [{"title": "", "reason": ""}], '
+                '"missing_info_questions": []}\n\n'
+                "Regeln: mind. 8 strengths mit konkretem Beleg, mind. 8 suggested_job_titles.\n\n"
+                f"Datei: {filename}\n\nEXTRAHIERTER TEXT:\n{extracted_text[:25000]}"
+            )
+
             full_reply = ""
             try:
                 async for tag, chunk in generate_structured_json_stream(_cv_sys, _cv_usr):
@@ -3164,13 +3191,6 @@ async def jobqueen_cv_stream(request: Request):
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    except asyncio.TimeoutError:
-        logger.error("jobqueen_cv_stream: Datei-Extraktion Timeout (>45s)")
-        return JSONResponse(
-            {"error": "Die Datei konnte nicht rechtzeitig verarbeitet werden (Timeout). "
-                      "Bitte eine kleinere/einfachere PDF-Datei versuchen."},
-            status_code=504,
-        )
     except Exception as e:
         logger.error("jobqueen_cv_stream Fehler: %s", e, exc_info=True)
         return JSONResponse({"error": str(e)[:500]}, status_code=500)
