@@ -3,6 +3,7 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     git ffmpeg libsm6 libxext6 gcc g++ \
     portaudio19-dev libsndfile1 libassimp-dev \
+    tesseract-ocr tesseract-ocr-deu \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -u 1000 user

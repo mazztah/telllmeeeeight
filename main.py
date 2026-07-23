@@ -3097,9 +3097,12 @@ async def jobqueen_cv_stream(request: Request):
                             break
                         except asyncio.TimeoutError:
                             waited += 8.0
-                            if waited >= 90.0:
+                            # NEU: Timeout-Budget angehoben (90s -> 150s), da der
+                            # OCR-Fallback fuer gescannte PDFs (siehe dv.py) auf
+                            # schwacher Hardware pro Seite mehrere Sekunden braucht.
+                            if waited >= 150.0:
                                 extract_task.cancel()
-                                logger.error("CV-Stream: Extraktion Timeout (>90s) fuer %s", filename)
+                                logger.error("CV-Stream: Extraktion Timeout (>150s) fuer %s", filename)
                                 yield f"data: {json.dumps({'error': 'Die Datei konnte nicht rechtzeitig verarbeitet werden (Timeout). Bitte eine kleinere/einfachere PDF-Datei versuchen.'}, ensure_ascii=False)}\n\n"
                                 return
                             # SSE-Kommentarzeile: haelt die Verbindung "lebendig",
@@ -3114,6 +3117,24 @@ async def jobqueen_cv_stream(request: Request):
             except Exception as exc:
                 logger.error("CV-Stream Extraktion Fehler: %s", exc, exc_info=True)
                 yield f"data: {json.dumps({'error': str(exc)[:200]}, ensure_ascii=False)}\n\n"
+                return
+
+            # NEU: KRITISCHE Sicherung gegen Halluzination. Wenn aus der Datei
+            # (auch nach OCR-Versuch) praktisch kein Text herauskam, darf das
+            # LLM NICHT trotzdem "analysieren" - es hat dann faktisch nichts
+            # zu analysieren und erfindet ansonsten ein komplett falsches,
+            # aber plausibel klingendes Profil (genau das urspruengliche
+            # Problem: gescanntes PDF -> 0 Zeichen -> LLM halluziniert ein
+            # frei erfundenes "Datenbank/SQL"-Profil statt zu sagen, dass es
+            # nichts lesen konnte).
+            _meaningful_len = len(extracted_text.strip())
+            if _meaningful_len < 250:
+                logger.error(
+                    "CV-Stream: Zu wenig extrahierter Text (%d Zeichen) fuer %s - "
+                    "LLM-Aufruf wird uebersprungen, um Halluzination zu vermeiden.",
+                    _meaningful_len, filename,
+                )
+                yield f"data: {json.dumps({'error': 'Aus der Datei konnte kein ausreichender Text erkannt werden (auch die automatische Texterkennung/OCR lieferte zu wenig Inhalt). Bitte eine Text-PDF hochladen oder die Scan-Qualitaet pruefen - eine Analyse mit so wenig Inhalt wuerde nur erfundene Ergebnisse liefern.'}, ensure_ascii=False)}\n\n"
                 return
 
             from bot_ai import generate_structured_json_stream
@@ -3233,10 +3254,28 @@ async def jobqueen_cv_analyze(request: Request):
             from dv import extract_content
             # Siehe cv_stream: blockierender Call -> in Thread auslagern + Timeout,
             # sonst friert die einzige Event-Loop ein und der vorgeschaltete Proxy
-            # liefert 502 fuer alle parallelen Anfragen.
+            # liefert 502 fuer alle parallelen Anfragen. Timeout angehoben (auf
+            # 150s), da der OCR-Fallback fuer gescannte PDFs mehrere Sekunden
+            # pro Seite braucht.
             extracted_text = await asyncio.wait_for(
-                asyncio.to_thread(extract_content, tmp_path, 30000), timeout=45.0
+                asyncio.to_thread(extract_content, tmp_path, 30000), timeout=150.0
             )
+
+            # NEU: KRITISCHE Sicherung gegen Halluzination - siehe cv_stream fuer
+            # ausfuehrliche Begruendung. Ohne verwertbaren Text darf das LLM
+            # nicht "analysieren", sonst erfindet es ein plausibel klingendes,
+            # aber komplett falsches Profil.
+            if len(extracted_text.strip()) < 250:
+                logger.error(
+                    "jobqueen_cv_analyze: Zu wenig extrahierter Text (%d Zeichen) fuer %s",
+                    len(extracted_text.strip()), filename,
+                )
+                return JSONResponse({
+                    "error": "Aus der Datei konnte kein ausreichender Text erkannt werden "
+                             "(auch die automatische Texterkennung/OCR lieferte zu wenig "
+                             "Inhalt). Bitte eine Text-PDF hochladen oder die Scan-Qualitaet "
+                             "pruefen.",
+                }, status_code=422)
 
             from bot_ai import generate_structured_json
             import re as _re_cv

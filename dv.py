@@ -36,6 +36,69 @@ def get_mime(file_path: str) -> str:
 
 
 # ====================== LESEN ======================
+def _ocr_pdf_fallback(file_path: str, num_pages: int, max_pages: int = 10, dpi: int = 150) -> str:
+    """OCR-Fallback fuer PDFs ohne (verwertbaren) Text-Layer, z.B. eingescannte
+    Bewerbungsmappen. Bewusst limitiert (max_pages, niedrige DPI), damit das
+    auch auf schwacher/1-Kern-Hardware in vertretbarer Zeit durchlaeuft - die
+    eigentlichen Lebenslauf-Seiten stehen bei Bewerbungsmappen ohnehin fast
+    immer am Anfang der Datei; nachfolgende Zeugnisse/Zertifikate sind fuer
+    die reine Profil-Extraktion zweitrangig. Bei fehlendem Tesseract/Sprachpaket
+    wird sauber degradiert (kein Crash) - der Aufrufer behandelt eine leere
+    Rueckgabe dann als "kein Text erkennbar".
+    """
+    try:
+        import pytesseract
+    except Exception as exc:
+        logger.warning("OCR-Fallback nicht verfuegbar (pytesseract fehlt): %s", exc)
+        return ""
+
+    # PyMuPDF (fitz) statt pdf2image/poppler fuer das Seiten-Rendering, da
+    # pymupdf bereits eine Projekt-Abhaengigkeit ist (reines Python-Wheel,
+    # kein zusaetzliches OS-Paket wie poppler-utils noetig) - portabler fuer
+    # unterschiedliche Deployment-Umgebungen.
+    try:
+        import fitz
+        from PIL import Image
+        import io as _io
+    except Exception as exc:
+        logger.warning("OCR-Fallback nicht verfuegbar (pymupdf/PIL fehlt): %s", exc)
+        return ""
+
+    try:
+        doc = fitz.open(file_path)
+        pages_to_scan = min(num_pages, max_pages, len(doc))
+        images = []
+        for i in range(pages_to_scan):
+            pix = doc[i].get_pixmap(dpi=dpi)
+            images.append(Image.open(_io.BytesIO(pix.tobytes("png"))))
+        doc.close()
+    except Exception as exc:
+        logger.warning("OCR-Fallback: PDF->Bild-Konvertierung fehlgeschlagen: %s", exc)
+        return ""
+
+    # Deutsch+Englisch bevorzugt (deutsche Bewerbungsunterlagen), faellt aber
+    # sauber auf Englisch/Standard zurueck, falls das deutsche Tesseract-
+    # Sprachpaket (tesseract-ocr-deu) auf dem Server nicht installiert ist.
+    lang_attempts = ["deu+eng", "eng", None]
+    texts = []
+    for img in images:
+        page_text = ""
+        for lang in lang_attempts:
+            try:
+                page_text = pytesseract.image_to_string(img, lang=lang) if lang else pytesseract.image_to_string(img)
+                break
+            except Exception as exc:
+                logger.debug("OCR Sprachpaket '%s' fehlgeschlagen: %s", lang, exc)
+                continue
+        texts.append(page_text)
+
+    combined = "\n".join(texts).strip()
+    if combined:
+        logger.info("OCR-Fallback erfolgreich: %d/%d Seiten gescannt, %d Zeichen erkannt",
+                     pages_to_scan, num_pages, len(combined))
+    return combined
+
+
 def extract_content(file_path: str, max_chars: int = 12000) -> str:
     mime = get_mime(file_path)
     name = os.path.basename(file_path)
@@ -56,7 +119,25 @@ def extract_content(file_path: str, max_chars: int = 12000) -> str:
             with open(file_path, "rb") as f:
                 reader = PyPDF2.PdfReader(f)
                 text = "".join(p.extract_text() or "" for p in reader.pages)
-            return f"📄 PDF '{name}' ({len(reader.pages)} Seiten):\n{text[:max_chars]} [...]"
+            num_pages = len(reader.pages)
+
+            # NEU: Viele "Bewerbungsmappen" sind eingescannte PDFs OHNE
+            # Text-Layer (nur Bilder). PyPDF2 liefert dann exakt 0 (oder fast
+            # 0) Zeichen zurueck. Ohne diesen Fallback wurde bisher trotzdem
+            # ein (praktisch leerer) "Extrakt" an das LLM geschickt, das
+            # daraufhin ein komplett erfundenes Profil halluziniert hat -
+            # OHNE dass das fuer den Nutzer erkennbar war. Fallback: OCR ueber
+            # die ersten Seiten (mehr Seiten waeren auf schwacher Hardware zu
+            # langsam; die eigentlichen Lebenslauf-Seiten stehen ohnehin am
+            # Anfang der Datei, Zeugnisse/Zertifikate danach sind sekundaer).
+            if len(text.strip()) < 200:
+                ocr_text = _ocr_pdf_fallback(file_path, num_pages)
+                if ocr_text:
+                    text = ocr_text
+                    return (f"📄 PDF '{name}' ({num_pages} Seiten, per OCR erkannt "
+                            f"- Scan ohne Text-Layer):\n{text[:max_chars]} [...]")
+
+            return f"📄 PDF '{name}' ({num_pages} Seiten):\n{text[:max_chars]} [...]"
 
         elif "wordprocessingml" in mime or mime.endswith("document"):
             doc = Document(file_path)

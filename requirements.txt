@@ -40,6 +40,9 @@ openpyxl>=3.0.0
 google-api-python-client>=2.160.0
 google-auth-oauthlib>=1.2.1
 google-auth-httplib2>=0.2.0
+# NEU: OCR-Fallback fuer gescannte PDFs ohne Text-Layer (siehe dv.py extract_content).
+# Benoetigt zusaetzlich das Tesseract-Binary + Sprachpaket auf OS-Ebene (siehe Dockerfile).
+pytesseract>=0.3.10
 
 # === Optional Local InstantMesh (not for slim Railway deploy) ===
 # Local-only heavy deps:
