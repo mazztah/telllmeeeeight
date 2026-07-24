@@ -2798,6 +2798,46 @@ def _cl_sanitize_filename(text: str, max_len: int = 40) -> str:
     return text[:max_len] or "Anschreiben"
 
 
+async def _fetch_full_job_description(url: str, max_chars: int = 5000) -> str:
+    """Best-Effort: laedt die volle Stellenanzeige von der Job-URL nach, da
+    die Jobboersen-APIs/Scraper meist nur einen kurzen Snippet (~300-400
+    Zeichen) liefern. Kein HTML-Parser im Projekt vorhanden -> schlanke
+    Regex-Extraktion (gleicher Stil wie die bestehenden Jobboersen-Scraper in
+    dieser Datei): Skripte/Styles/Nav entfernen, Tags strippen, Whitespace
+    normalisieren. Nicht perfekt fuer jede Seitenstruktur, aber deutlich mehr
+    Kontext als der kurze Snippet. Bei Fehlern (403/Timeout/etc.) leerer
+    String -> Aufrufer faellt automatisch auf den Snippet zurueck.
+    """
+    if not url:
+        return ""
+    try:
+        async with httpx.AsyncClient(
+            timeout=12.0, follow_redirects=True,
+            headers={
+                "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
+                "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+            },
+        ) as client:
+            r = await client.get(url)
+            if r.status_code != 200:
+                logger.info("Vollbeschreibung-Fetch: HTTP %d fuer %s", r.status_code, url)
+                return ""
+            html = r.text
+    except Exception as exc:
+        logger.info("Vollbeschreibung-Fetch fehlgeschlagen fuer %s: %s", url, exc)
+        return ""
+
+    text = _re.sub(r"(?is)<(script|style|nav|header|footer|noscript)[^>]*>.*?</\1>", " ", html)
+    text = _re.sub(r"(?s)<[^>]+>", " ", text)
+    import html as _html_mod
+    text = _html_mod.unescape(text)
+    text = _re.sub(r"[ \t]+", " ", text)
+    text = _re.sub(r"\n\s*\n+", "\n", text)
+    text = text.strip()
+    return text[:max_chars]
+
+
 @app.post("/api/jobqueen/coverletter/draft")
 async def jobqueen_coverletter_draft(request: Request):
     """Generiert EIN einzelnes, auf die Stellenbeschreibung UND (falls vorhanden)
@@ -2825,6 +2865,18 @@ async def jobqueen_coverletter_draft(request: Request):
         job_company = (job.get("company") or "").strip()
         job_location = (job.get("location") or "").strip()
         job_desc = (job.get("description_snippet") or job.get("description") or "").strip()
+
+        # NEU: volle Stellenbeschreibung von der Job-URL nachladen statt nur
+        # mit dem kurzen Snippet (~300-400 Zeichen) der Jobboersen-APIs zu
+        # arbeiten - deutlich praezisere Anschreiben moeglich. Best-Effort:
+        # schlaegt der Abruf fehl, wird einfach der Snippet weiterverwendet.
+        job_url = (job.get("url") or "").strip()
+        full_desc_used = False
+        if job_url:
+            full_desc = await _fetch_full_job_description(job_url)
+            if len(full_desc) > len(job_desc) + 100:
+                job_desc = full_desc
+                full_desc_used = True
 
         profile_hint = json.dumps({
             "name": profile.get("name"),
@@ -2870,7 +2922,7 @@ async def jobqueen_coverletter_draft(request: Request):
         _cl_user = (
             "Erstelle EIN massgeschneidertes Bewerbungsanschreiben auf Deutsch fuer folgende Stelle:\n"
             f"- Position: {job_title}\n- Unternehmen: {job_company}\n- Ort: {job_location}\n"
-            f"- Stellenbeschreibung/Auszug: {job_desc[:1500]}\n\n"
+            f"- Stellenbeschreibung/Auszug: {job_desc[:3500]}\n\n"
             f"PROFIL DES BEWERBERS (mit voller Rollen-Historie + Belegen): {profile_hint}\n\n"
             f"{cv_block}"
             + (f"Zusaetzliche Wuensche des Nutzers: {extra}\n\n" if extra else "")
@@ -2921,6 +2973,7 @@ async def jobqueen_coverletter_draft(request: Request):
             "job_key": job_key,
             "letter": letter,
             "has_cv": has_cv,
+            "full_description_used": full_desc_used,
         })
 
     except Exception as e:
@@ -3301,7 +3354,7 @@ async def jobqueen_cv_stream(request: Request):
 
             full_reply = ""
             try:
-                async for tag, chunk in generate_structured_json_stream(_cv_sys, _cv_usr):
+                async for tag, chunk in generate_structured_json_stream(_cv_sys, _cv_usr, max_tokens=6000):
                     if tag == "text":
                         full_reply += chunk
                         yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
@@ -3497,7 +3550,7 @@ async def jobqueen_cv_analyze(request: Request):
                 f"Lebenslauf Datei: {filename}\n\nEXTRAHIERTER TEXT:\n{extracted_text[:25000]}"
             )
 
-            reply = await generate_structured_json(_cv_system, _cv_user)
+            reply = await generate_structured_json(_cv_system, _cv_user, max_tokens=6000)
 
             # Robustes JSON-Parsing: Markdown-Codeblocks entfernen, dann {…} extrahieren
             profile = {}

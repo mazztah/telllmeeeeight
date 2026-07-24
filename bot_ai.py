@@ -336,7 +336,7 @@ async def generate_response(chat_id: str, message: str) -> str:
     return fallback_reply
 
 
-async def generate_structured_json(system_prompt: str, user_message: str) -> str:
+async def generate_structured_json(system_prompt: str, user_message: str, max_tokens: int = 4096) -> str:
     """Direkte LLM-Anfrage ohne Chat-History und ohne Sandy-Persona.
     Optimal für strukturierte JSON-Ausgaben (CV-Analyse, Job-Listings, etc.).
     Verwendet niedrige Temperature für konsistentes JSON.
@@ -368,13 +368,25 @@ async def generate_structured_json(system_prompt: str, user_message: str) -> str
                     model=model_name,
                     messages=messages,
                     temperature=0.1,
-                    max_tokens=4096,
+                    max_tokens=max_tokens,
                     top_p=0.9,
                     stream=False,
                 ),
                 timeout=60.0,
             )
             reply = (completion.choices[0].message.content or "").strip()
+            finish_reason = getattr(completion.choices[0], "finish_reason", None)
+            if finish_reason == "length":
+                # NEU: Antwort wurde wegen max_tokens abgeschnitten - das JSON
+                # ist damit fast sicher unvollstaendig/ungueltig. Sichtbar
+                # loggen statt stillschweigend als "Erfolg" durchzureichen,
+                # damit sowas kuenftig sofort auffaellt statt als raetselhafte
+                # "leere/ungueltige LLM-Antwort" beim Nutzer zu landen.
+                logger.warning(
+                    "generate_structured_json Modell %s: Antwort wegen max_tokens=%d "
+                    "ABGESCHNITTEN (finish_reason=length, %d Zeichen erhalten) - "
+                    "JSON vermutlich ungueltig.", model_name, max_tokens, len(reply)
+                )
             if not reply:
                 logger.warning("generate_structured_json Modell %s lieferte leere Antwort", model_name)
                 continue
@@ -390,7 +402,7 @@ async def generate_structured_json(system_prompt: str, user_message: str) -> str
     return ""
 
 
-async def generate_structured_json_stream(system_prompt: str, user_message: str):
+async def generate_structured_json_stream(system_prompt: str, user_message: str, max_tokens: int = 4096):
     """Streaming-Version von generate_structured_json.
     Yields (tag, content): tag='text' für Chunks, tag='done' mit vollständigem Text.
     Kein Chat-History, kein Sandy-Kontext, temperature 0.1.
@@ -422,13 +434,14 @@ async def generate_structured_json_stream(system_prompt: str, user_message: str)
                     model=model_name,
                     messages=messages,
                     temperature=0.1,
-                    max_tokens=4096,
+                    max_tokens=max_tokens,
                     top_p=0.9,
                     stream=True,
                 ),
                 timeout=60.0,
             )
             iterator = iter(stream)
+            finish_reason = None
             while True:
                 chunk = await asyncio.wait_for(
                     asyncio.to_thread(lambda it=iterator: next(it, None)),
@@ -436,10 +449,21 @@ async def generate_structured_json_stream(system_prompt: str, user_message: str)
                 )
                 if chunk is None:
                     break
+                if chunk.choices and getattr(chunk.choices[0], "finish_reason", None):
+                    finish_reason = chunk.choices[0].finish_reason
                 delta = (chunk.choices[0].delta.content or "") if chunk.choices else ""
                 if delta:
                     full_reply += delta
                     yield ("text", delta)
+
+            if finish_reason == "length":
+                # NEU: siehe generate_structured_json - abgeschnittene Antwort
+                # sichtbar loggen, da das JSON dann fast sicher ungueltig ist.
+                logger.warning(
+                    "generate_structured_json_stream Modell %s: Antwort wegen "
+                    "max_tokens=%d ABGESCHNITTEN (finish_reason=length, %d Zeichen "
+                    "erhalten) - JSON vermutlich ungueltig.", model_name, max_tokens, len(full_reply)
+                )
 
             if not full_reply.strip():
                 logger.warning("generate_structured_json_stream Modell %s lieferte leeren Stream", model_name)
