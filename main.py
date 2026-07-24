@@ -3423,11 +3423,14 @@ async def jobqueen_cv_stream(request: Request):
             )
 
             full_reply = ""
+            error_detail = ""
             try:
                 async for tag, chunk in generate_structured_json_stream(_cv_sys, _cv_usr, max_tokens=6000):
                     if tag == "text":
                         full_reply += chunk
                         yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
+                    elif tag == "error_detail":
+                        error_detail = chunk
                     elif tag == "done":
                         profile, parse_reason = _repair_and_parse_json(full_reply)
                         parse_ok = bool(profile)
@@ -3452,6 +3455,8 @@ async def jobqueen_cv_stream(request: Request):
                             if parse_reason == "empty":
                                 err_msg = ("Das KI-Modell hat keine Antwort geliefert (evtl. "
                                            "ueberlastet/Rate-Limit). Bitte kurz warten und erneut versuchen.")
+                                if error_detail:
+                                    err_msg += f"\n\nDetails: {error_detail[:400]}"
                             else:
                                 err_msg = ("Die Analyse-Antwort war fehlerhaft und konnte auch nach "
                                            "Reparaturversuch nicht ausgewertet werden. Bitte erneut "
@@ -3624,7 +3629,18 @@ async def jobqueen_cv_analyze(request: Request):
                 f"Lebenslauf Datei: {filename}\n\nEXTRAHIERTER TEXT:\n{extracted_text[:25000]}"
             )
 
-            reply = await generate_structured_json(_cv_system, _cv_user, max_tokens=6000)
+            try:
+                reply = await generate_structured_json(_cv_system, _cv_user, max_tokens=6000)
+            except Exception as _llm_exc:
+                # NEU: generate_structured_json wirft jetzt eine detaillierte
+                # RuntimeError statt "" zurueckzugeben, wenn ALLE Modelle
+                # fehlschlagen - Grund direkt an den Nutzer durchreichen statt
+                # nur "leere Antwort" ohne Diagnosewert.
+                logger.error("jobqueen_cv_analyze: LLM-Aufruf fehlgeschlagen: %s", _llm_exc)
+                return JSONResponse({
+                    "error": ("Das KI-Modell hat keine Antwort geliefert (evtl. ueberlastet/"
+                              f"Rate-Limit). Bitte kurz warten und erneut versuchen.\n\nDetails: {str(_llm_exc)[:400]}"),
+                }, status_code=502)
 
             # Robustes JSON-Parsing mit Reparatur-Fallback (siehe _repair_and_parse_json
             # oben - rettet auch bei max_tokens abgeschnittene Antworten, statt sie
