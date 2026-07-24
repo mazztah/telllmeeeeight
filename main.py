@@ -2786,6 +2786,59 @@ async def jobqueen_coverletters(request: Request):
         return JSONResponse({"error": str(e)[:500]}, status_code=500)
 
 
+def _repair_and_parse_json(raw_text: str):
+    """Versucht ein (moeglicherweise abgeschnittenes/leicht fehlerhaftes) JSON
+    aus einer LLM-Antwort zu parsen. Gibt (parsed_dict_oder_None, reason) zurueck.
+    reason ist einer von: 'empty', 'ok', 'ok_repaired', 'parse_failed'.
+    Wird u.a. gebraucht, weil ein bei max_tokens abgeschnittenes JSON sonst
+    komplett verworfen wuerde, obwohl der Grossteil der Daten meist noch
+    brauchbar/reparierbar ist (fehlende schliessende Klammern ergaenzen).
+    """
+    import re as _re_rp
+    if not raw_text or not raw_text.strip():
+        return None, "empty"
+
+    cleaned = _re_rp.sub(r'```(?:json)?\s*|\s*```', '', raw_text).strip()
+    start = cleaned.find('{')
+    if start == -1:
+        return None, "parse_failed"
+    candidate = cleaned[start:]
+
+    # 1) Direkter Versuch (haeufigster Fall: alles ok)
+    end = candidate.rfind('}')
+    if end != -1:
+        try:
+            return json.loads(candidate[:end + 1]), "ok"
+        except Exception:
+            pass
+
+    # 2) Reparatur-Versuch fuer abgeschnittene JSON-Antworten: von hinten nach
+    # vorne jeden plausiblen Abschneide-Punkt (',', '}', ']') durchprobieren,
+    # Klammern per Bilanz schliessen, bis ein gueltiges JSON entsteht. Kann
+    # bei sehr langen Antworten viele Versuche brauchen, json.loads schlaegt
+    # bei ungueltigem JSON aber sehr schnell fehl (Mikrosekunden), daher in
+    # der Praxis unproblematisch (max. ~1-2s selbst bei mehreren tausend
+    # Zeichen).
+    cut_chars = ('}', ']', ',')
+    for i in range(len(candidate) - 1, -1, -1):
+        if candidate[i] not in cut_chars:
+            continue
+        frag = candidate[:i + 1] if candidate[i] in ('}', ']') else candidate[:i]
+        if not frag.strip():
+            continue
+        oc, cc = frag.count('{'), frag.count('}')
+        osq, csq = frag.count('['), frag.count(']')
+        closer = ']' * max(0, osq - csq) + '}' * max(0, oc - cc)
+        try:
+            parsed = json.loads(frag + closer)
+            if parsed:
+                return parsed, "ok_repaired"
+        except Exception:
+            continue
+
+    return None, "parse_failed"
+
+
 def _cl_job_key(job: dict) -> str:
     job = job or {}
     return (job.get("url") or job.get("id") or job.get("title") or "job").strip()
@@ -3359,18 +3412,13 @@ async def jobqueen_cv_stream(request: Request):
                         full_reply += chunk
                         yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
                     elif tag == "done":
-                        profile = {}
-                        parse_ok = False
-                        if full_reply:
-                            cleaned = _re_cvs.sub(r'```(?:json)?\s*|\s*```', '', full_reply).strip()
-                            s = cleaned.find('{')
-                            e = cleaned.rfind('}')
-                            if s != -1 and e != -1:
-                                try:
-                                    profile = json.loads(cleaned[s:e + 1])
-                                    parse_ok = bool(profile)
-                                except Exception as _jp:
-                                    logger.warning("CV-Stream JSON-Parse: %s", _jp)
+                        profile, parse_reason = _repair_and_parse_json(full_reply)
+                        parse_ok = bool(profile)
+                        if parse_reason == "ok_repaired":
+                            logger.warning(
+                                "CV-Stream: Profil-JSON war abgeschnitten/fehlerhaft, aber "
+                                "erfolgreich repariert (%d Zeichen Rohantwort).", len(full_reply)
+                            )
 
                         # NEU: Bei leerer/ungueltiger Antwort (z.B. weil das LLM-Modell
                         # fehlgeschlagen ist) NICHT stillschweigend ein leeres Profil
@@ -3380,10 +3428,19 @@ async def jobqueen_cv_stream(request: Request):
                         # im State NICHT ueberschreiben.
                         if not parse_ok:
                             logger.error(
-                                "CV-Stream: Profil-Analyse fehlgeschlagen (leere/ungueltige LLM-Antwort). "
-                                "full_reply_len=%d", len(full_reply)
+                                "CV-Stream: Profil-Analyse fehlgeschlagen (Grund=%s). "
+                                "full_reply_len=%d full_reply_preview=%r",
+                                parse_reason, len(full_reply), full_reply[:300],
                             )
-                            yield f"data: {json.dumps({'error': 'Die Analyse hat kein verwertbares Ergebnis geliefert (LLM-Antwort leer/ungueltig). Bitte kurz warten und erneut versuchen.'}, ensure_ascii=False)}\n\n"
+                            if parse_reason == "empty":
+                                err_msg = ("Das KI-Modell hat keine Antwort geliefert (evtl. "
+                                           "ueberlastet/Rate-Limit). Bitte kurz warten und erneut versuchen.")
+                            else:
+                                err_msg = ("Die Analyse-Antwort war fehlerhaft und konnte auch nach "
+                                           "Reparaturversuch nicht ausgewertet werden. Bitte erneut "
+                                           "versuchen - tritt das wiederholt auf, ist die Datei evtl. "
+                                           "zu umfangreich fuer eine einzelne Analyse.")
+                            yield f"data: {json.dumps({'error': err_msg}, ensure_ascii=False)}\n\n"
                             return
 
                         from bot_state import jobqueen_state as _jqs2
@@ -3552,30 +3609,35 @@ async def jobqueen_cv_analyze(request: Request):
 
             reply = await generate_structured_json(_cv_system, _cv_user, max_tokens=6000)
 
-            # Robustes JSON-Parsing: Markdown-Codeblocks entfernen, dann {…} extrahieren
-            profile = {}
-            if reply:
-                cleaned_reply = _re_cv.sub(r'```(?:json)?\s*|\s*```', '', reply).strip()
-                start = cleaned_reply.find('{')
-                end = cleaned_reply.rfind('}')
-                if start != -1 and end != -1 and end > start:
-                    try:
-                        profile = json.loads(cleaned_reply[start:end + 1])
-                    except Exception as _je:
-                        logger.warning("CV JSON-Parse Fehler: %s | Reply[:200]: %s", _je, cleaned_reply[:200])
-                        profile = {}
+            # Robustes JSON-Parsing mit Reparatur-Fallback (siehe _repair_and_parse_json
+            # oben - rettet auch bei max_tokens abgeschnittene Antworten, statt sie
+            # komplett zu verwerfen).
+            profile, parse_reason = _repair_and_parse_json(reply)
+            if parse_reason == "ok_repaired":
+                logger.warning(
+                    "jobqueen_cv_analyze: Profil-JSON war abgeschnitten/fehlerhaft, aber "
+                    "erfolgreich repariert (%d Zeichen Rohantwort).", len(reply or "")
+                )
 
             # NEU: Bei leerer/ungueltiger LLM-Antwort NICHT "success": True mit
             # leerem Profil melden (sah fuer den Nutzer wie eine erfolgreiche,
             # aber duerftige Analyse aus) - stattdessen klaren Fehler zurueckgeben
             # und den evtl. vorhandenen alten Profil-Stand NICHT ueberschreiben.
             if not profile:
-                logger.error("jobqueen_cv_analyze: leere/ungueltige LLM-Antwort, reply_len=%d",
-                             len(reply or ""))
-                return JSONResponse({
-                    "error": "Die Analyse hat kein verwertbares Ergebnis geliefert "
-                             "(LLM-Antwort leer/ungueltig). Bitte kurz warten und erneut versuchen.",
-                }, status_code=502)
+                logger.error(
+                    "jobqueen_cv_analyze: Profil-Analyse fehlgeschlagen (Grund=%s). "
+                    "reply_len=%d reply_preview=%r",
+                    parse_reason, len(reply or ""), (reply or "")[:300],
+                )
+                if parse_reason == "empty":
+                    err_msg = ("Das KI-Modell hat keine Antwort geliefert (evtl. "
+                               "ueberlastet/Rate-Limit). Bitte kurz warten und erneut versuchen.")
+                else:
+                    err_msg = ("Die Analyse-Antwort war fehlerhaft und konnte auch nach "
+                               "Reparaturversuch nicht ausgewertet werden. Bitte erneut versuchen "
+                               "- tritt das wiederholt auf, ist die Datei evtl. zu umfangreich "
+                               "fuer eine einzelne Analyse.")
+                return JSONResponse({"error": err_msg}, status_code=502)
 
             from bot_state import jobqueen_state
             jobqueen_state.setdefault(chat_id, {})
