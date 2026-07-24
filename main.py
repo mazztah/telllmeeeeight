@@ -2865,7 +2865,7 @@ async def _fetch_full_job_description(url: str, max_chars: int = 5000) -> str:
         return ""
     try:
         async with httpx.AsyncClient(
-            timeout=12.0, follow_redirects=True,
+            timeout=8.0, follow_redirects=True,
             headers={
                 "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                 "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
@@ -2877,18 +2877,22 @@ async def _fetch_full_job_description(url: str, max_chars: int = 5000) -> str:
                 logger.info("Vollbeschreibung-Fetch: HTTP %d fuer %s", r.status_code, url)
                 return ""
             html = r.text
+
+        # NEU: Regex-Verarbeitung war vorher AUSSERHALB des try-Blocks - ein
+        # Fehler hier (z.B. bei ungewoehnlichem HTML/Encoding) hat den
+        # kompletten Anschreiben-Endpoint mit 500 abstuerzen lassen, statt
+        # nur den Snippet-Fallback auszuloesen. Jetzt komplett abgesichert.
+        text = _re.sub(r"(?is)<(script|style|nav|header|footer|noscript)[^>]*>.*?</\1>", " ", html)
+        text = _re.sub(r"(?s)<[^>]+>", " ", text)
+        import html as _html_mod
+        text = _html_mod.unescape(text)
+        text = _re.sub(r"[ \t]+", " ", text)
+        text = _re.sub(r"\n\s*\n+", "\n", text)
+        text = text.strip()
+        return text[:max_chars]
     except Exception as exc:
         logger.info("Vollbeschreibung-Fetch fehlgeschlagen fuer %s: %s", url, exc)
         return ""
-
-    text = _re.sub(r"(?is)<(script|style|nav|header|footer|noscript)[^>]*>.*?</\1>", " ", html)
-    text = _re.sub(r"(?s)<[^>]+>", " ", text)
-    import html as _html_mod
-    text = _html_mod.unescape(text)
-    text = _re.sub(r"[ \t]+", " ", text)
-    text = _re.sub(r"\n\s*\n+", "\n", text)
-    text = text.strip()
-    return text[:max_chars]
 
 
 @app.post("/api/jobqueen/coverletter/draft")
@@ -2922,14 +2926,31 @@ async def jobqueen_coverletter_draft(request: Request):
         # NEU: volle Stellenbeschreibung von der Job-URL nachladen statt nur
         # mit dem kurzen Snippet (~300-400 Zeichen) der Jobboersen-APIs zu
         # arbeiten - deutlich praezisere Anschreiben moeglich. Best-Effort:
-        # schlaegt der Abruf fehl, wird einfach der Snippet weiterverwendet.
+        # schlaegt der Abruf fehl ODER dauert zu lange, wird einfach der
+        # Snippet weiterverwendet. Dieser Endpoint ist NICHT SSE/streaming
+        # (anders als CV-Analyse) - ein haengender Fetch wuerde die gesamte
+        # Anfrage riskieren (gleiches "Failed to fetch"-Problem wie zuvor bei
+        # der CV-Analyse), daher hartes Zeitlimit mit sauberem Fallback.
         job_url = (job.get("url") or "").strip()
         full_desc_used = False
         if job_url:
-            full_desc = await _fetch_full_job_description(job_url)
+            try:
+                full_desc = await asyncio.wait_for(_fetch_full_job_description(job_url), timeout=9.0)
+            except Exception as exc:
+                logger.info("Vollbeschreibung-Fetch Timeout/Fehler fuer %s: %s", job_url, exc)
+                full_desc = ""
             if len(full_desc) > len(job_desc) + 100:
                 job_desc = full_desc
                 full_desc_used = True
+
+        # NEU: defensiv gegen unerwartete Profil-Formen (z.B. wenn ein per
+        # JSON-Reparatur gerettetes Teilprofil 'experience_details' als
+        # unerwarteten Typ enthaelt) - verhindert einen 500er beim
+        # Anschreiben-Erstellen direkt nach einer (ggf. reparierten) CV-Analyse.
+        _exp_details = profile.get("experience_details")
+        _roles = _exp_details.get("roles") if isinstance(_exp_details, dict) else None
+        if not isinstance(_roles, list):
+            _roles = []
 
         profile_hint = json.dumps({
             "name": profile.get("name"),
@@ -2940,13 +2961,13 @@ async def jobqueen_coverletter_draft(request: Request):
             # NEU: volle Rollen-Historie (Titel/Firma/Zeitraum) statt nur
             # verdichteter Skills - so kann das LLM konkrete, echte Stationen
             # nennen statt vager Umschreibungen.
-            "roles": (profile.get("experience_details") or {}).get("roles") or [],
+            "roles": _roles,
             # NEU: Beleg mit ausgeben, nicht nur das Label - der Beleg IST das,
             # was ein Anschreiben ueberzeugend statt generisch macht.
             "strengths": [
                 {"strength": s.get("strength"), "evidence": s.get("evidence")}
-                for s in (profile.get("strengths") or [])[:10] if isinstance(s, dict)
-            ],
+                for s in (profile.get("strengths") or []) if isinstance(s, dict)
+            ][:10],
         }, ensure_ascii=False) if profile else "{}"
 
         from bot_ai import generate_structured_json
@@ -3000,19 +3021,15 @@ async def jobqueen_coverletter_draft(request: Request):
             "- Keine erfundenen Fakten - nur verwenden, was im Profil/CV-Text tatsaechlich steht."
         )
 
-        reply = await generate_structured_json(_cl_system, _cl_user)
-        letter = {}
-        if reply:
-            cleaned = _re_cld.sub(r'```(?:json)?\s*|\s*```', '', reply).strip()
-            s = cleaned.find('{')
-            e = cleaned.rfind('}')
-            if s != -1 and e != -1:
-                try:
-                    letter = json.loads(cleaned[s:e + 1])
-                except Exception:
-                    letter = {}
+        reply = await generate_structured_json(_cl_system, _cl_user, max_tokens=2500)
+        letter, _letter_parse_reason = _repair_and_parse_json(reply)
+        letter = letter or {}
 
         if not letter or not letter.get("paragraphs"):
+            logger.error(
+                "jobqueen_coverletter_draft: Anschreiben-Generierung fehlgeschlagen "
+                "(Grund=%s, reply_len=%d)", _letter_parse_reason, len(reply or "")
+            )
             return JSONResponse({"error": "Anschreiben konnte nicht generiert werden. Bitte erneut versuchen."},
                                  status_code=502)
 
