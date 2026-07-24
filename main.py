@@ -2831,7 +2831,17 @@ async def jobqueen_coverletter_draft(request: Request):
             "skills": profile.get("skills"),
             "languages": profile.get("languages"),
             "experience_years": profile.get("experience_years"),
-            "strengths": [s.get("strength") for s in (profile.get("strengths") or [])[:8] if isinstance(s, dict)],
+            "experience_months": profile.get("experience_months"),
+            # NEU: volle Rollen-Historie (Titel/Firma/Zeitraum) statt nur
+            # verdichteter Skills - so kann das LLM konkrete, echte Stationen
+            # nennen statt vager Umschreibungen.
+            "roles": (profile.get("experience_details") or {}).get("roles") or [],
+            # NEU: Beleg mit ausgeben, nicht nur das Label - der Beleg IST das,
+            # was ein Anschreiben ueberzeugend statt generisch macht.
+            "strengths": [
+                {"strength": s.get("strength"), "evidence": s.get("evidence")}
+                for s in (profile.get("strengths") or [])[:10] if isinstance(s, dict)
+            ],
         }, ensure_ascii=False) if profile else "{}"
 
         from bot_ai import generate_structured_json
@@ -2840,12 +2850,17 @@ async def jobqueen_coverletter_draft(request: Request):
         _cl_system = (
             "Du bist ein erstklassiger Karriereberater und Bewerbungsanschreiben-Texter. "
             "Du schreibst individuelle, ueberzeugende deutsche Bewerbungsanschreiben, "
-            "niemals generische Textbausteine. Antworte AUSSCHLIESSLICH mit gueltigem JSON, "
-            "kein Fliesstext, keine Markdown-Codeblocks."
+            "niemals generische Textbausteine. Du verknuepfst IMMER konkrete Details aus dem "
+            "Lebenslauf (echte Firmennamen, Positionen, Zeitraeume, Erfolge) mit den konkreten "
+            "Anforderungen der Stellenausschreibung - keine austauschbaren Floskeln. "
+            "Antworte AUSSCHLIESSLICH mit gueltigem JSON, kein Fliesstext, keine Markdown-Codeblocks."
         )
 
+        # NEU: mehr Rohtext (10000 statt 6000 Zeichen) - seit der OCR-
+        # Verbesserung deckt der extrahierte Text nun die komplette
+        # Berufshistorie ab, nicht nur die ersten 1-2 Stationen.
         cv_block = (
-            f"AUSZUG AUS DEN HOCHGELADENEN BEWERBUNGSUNTERLAGEN (Lebenslauf, Originaltext):\n{cv_raw_text[:6000]}\n\n"
+            f"AUSZUG AUS DEN HOCHGELADENEN BEWERBUNGSUNTERLAGEN (Lebenslauf, Originaltext):\n{cv_raw_text[:10000]}\n\n"
             if cv_raw_text else
             "Es wurden KEINE Bewerbungsunterlagen (Lebenslauf) hochgeladen. Schreibe ein "
             "ueberzeugendes, aber bewusst allgemeiner gehaltenes Anschreiben basierend nur auf "
@@ -2856,19 +2871,28 @@ async def jobqueen_coverletter_draft(request: Request):
             "Erstelle EIN massgeschneidertes Bewerbungsanschreiben auf Deutsch fuer folgende Stelle:\n"
             f"- Position: {job_title}\n- Unternehmen: {job_company}\n- Ort: {job_location}\n"
             f"- Stellenbeschreibung/Auszug: {job_desc[:1500]}\n\n"
-            f"PROFIL DES BEWERBERS (verdichtet): {profile_hint}\n\n"
+            f"PROFIL DES BEWERBERS (mit voller Rollen-Historie + Belegen): {profile_hint}\n\n"
             f"{cv_block}"
             + (f"Zusaetzliche Wuensche des Nutzers: {extra}\n\n" if extra else "")
             + "Gib EXAKT folgendes JSON-Schema zurueck (nur JSON):\n"
             "{\n"
             '  "subject": "Bewerbung als ... (praezise, mit Positions-Bezug, ggf. Referenznummer)",\n'
             '  "salutation": "Sehr geehrte Damen und Herren," (oder konkreter Name falls aus Text ableitbar),\n'
-            '  "paragraphs": ["Absatz 1: Einstieg + Bezug zur Stelle", "Absatz 2: passende Qualifikationen/Erfahrung mit konkreten Belegen aus dem Profil/CV", "Absatz 3: Motivation fuer genau dieses Unternehmen", "Absatz 4: Abschluss, Verfuegbarkeit, Gesprächswunsch"],\n'
+            '  "paragraphs": ["Absatz 1: Einstieg + konkreter Bezug zur Stelle/zum Unternehmen", "Absatz 2: 1-2 KONKRETE bisherige Positionen/Arbeitgeber nennen und deren Aufgaben/Erfolge direkt mit den Anforderungen aus der Stellenausschreibung verknuepfen", "Absatz 3: weitere passende Faehigkeiten/Erfahrungen mit Beleg, Motivation fuer genau dieses Unternehmen", "Absatz 4: Abschluss, Verfuegbarkeit, Gespraechswunsch"],\n'
             '  "closing": "Mit freundlichen Gruessen",\n'
             '  "signature_name": "Name aus dem Profil, falls vorhanden, sonst leer"\n'
             "}\n\n"
-            "Regeln: 3-5 Absaetze, insgesamt max. ca. 320 Woerter, keine Floskeln-Ueberladung, "
-            "konkret und auf die Stelle bezogen, keine erfundenen Fakten."
+            "WICHTIGE Regeln:\n"
+            "- Nenne in Absatz 2 explizit mindestens 1-2 echte Positionen/Arbeitgeber aus der "
+            "Rollen-Historie (nicht nur die aktuellste Station, auch fruehere falls relevanter fuer "
+            "diese Stellenausschreibung) und verbinde sie klar mit dem, was in der Stellenbeschreibung "
+            "gefordert wird.\n"
+            "- Nutze wo moeglich konkrete Zahlen/Belege aus 'strengths.evidence'.\n"
+            "- Falls die Stellenbeschreibung konkrete Anforderungen/Stichworte enthaelt (z.B. Software, "
+            "Zertifikate, Aufgabenbereiche), greife diese woertlich oder sinngemaess auf und zeige, wo "
+            "im Lebenslauf genau diese Erfahrung vorhanden ist.\n"
+            "- 3-5 Absaetze, insgesamt max. ca. 350 Woerter, keine Floskeln-Ueberladung.\n"
+            "- Keine erfundenen Fakten - nur verwenden, was im Profil/CV-Text tatsaechlich steht."
         )
 
         reply = await generate_structured_json(_cl_system, _cl_user)
@@ -2904,6 +2928,48 @@ async def jobqueen_coverletter_draft(request: Request):
         return JSONResponse({"error": str(e)[:500]}, status_code=500)
 
 
+async def _lookup_company_address(company: str, location: str) -> dict:
+    """Best-effort Adress-Recherche fuer den Empfaenger ueber die kostenlose
+    OpenStreetMap/Nominatim-Geocoding-API (kein API-Key noetig). Liefert
+    IMMER einen 'verified'-Flag mit zurueck - wird nichts Verlaessliches
+    gefunden, wird NICHTS erfunden (nur Firma+Ort als Fallback), da eine
+    falsche Adresse auf einer echten Bewerbung mehr schadet als eine
+    unvollstaendige. Nominatim-Nutzungsrichtlinie verlangt einen eigenen
+    User-Agent und max. ~1 Anfrage/Sekunde - fuer diesen Einzelfall-Aufruf
+    unkritisch.
+    """
+    query = f"{company}, {location}, Deutschland".strip(", ")
+    result = {"address": "", "verified": False}
+    if not company:
+        return result
+    try:
+        async with httpx.AsyncClient(
+            timeout=8.0,
+            headers={"User-Agent": "JobQueenApp/1.0 (Bewerbungs-Assistent)"},
+        ) as client:
+            r = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": query, "format": "json", "limit": 1, "countrycodes": "de", "addressdetails": 1},
+            )
+            if r.status_code == 200:
+                hits = r.json()
+                if hits:
+                    hit = hits[0]
+                    display = hit.get("display_name", "")
+                    addr = hit.get("address", {})
+                    street = " ".join(filter(None, [addr.get("road"), addr.get("house_number")]))
+                    plz_ort = " ".join(filter(None, [addr.get("postcode"), addr.get("city") or addr.get("town") or addr.get("village")]))
+                    if street and plz_ort:
+                        result["address"] = f"{street}, {plz_ort}"
+                        result["verified"] = True
+                    elif display:
+                        # Nur als schwacher Hinweis, NICHT als 'verified' markieren
+                        result["address"] = ""
+    except Exception as exc:
+        logger.info("Adress-Lookup fehlgeschlagen fuer '%s': %s", query, exc)
+    return result
+
+
 @app.post("/api/jobqueen/coverletter/export")
 async def jobqueen_coverletter_export(request: Request):
     """Erstellt aus einem (zuvor generierten) Anschreiben ein perfekt formatiertes
@@ -2935,16 +3001,52 @@ async def jobqueen_coverletter_export(request: Request):
                 status_code=400)
 
         profile = state.get("profile") or {}
+
+        # NEU: Kontakt-Links (Website/LinkedIn/Xing) werden nur einmal pro
+        # Chat mitgeschickt und dann im State gemerkt, damit sie bei jedem
+        # weiteren Anschreiben automatisch wieder verwendet werden.
+        saved_links = state.get("sender_links") or {}
+        link_fields = {}
+        for k in ("website", "linkedin", "xing"):
+            v = sender_override.get(k) or saved_links.get(k) or ""
+            if v:
+                link_fields[k] = v
+        if any(sender_override.get(k) for k in ("website", "linkedin", "xing")):
+            state["sender_links"] = {**saved_links, **{k: v for k, v in link_fields.items()}}
+
+        # NEU: Absenderdaten (Adresse/E-Mail/Telefon) automatisch aus dem
+        # bereits analysierten CV-Profil uebernehmen, statt sie zu vergessen -
+        # explizite sender_override-Werte haben weiterhin Vorrang.
         sender = {
             "name": sender_override.get("name") or profile.get("name") or "",
-            "address": sender_override.get("address") or "",
-            "email": sender_override.get("email") or "",
-            "phone": sender_override.get("phone") or "",
+            "address": sender_override.get("address") or profile.get("address") or "",
+            "email": sender_override.get("email") or profile.get("email") or "",
+            "phone": sender_override.get("phone") or profile.get("phone") or "",
+            **link_fields,
         }
+
+        # NEU: Empfaengeradresse - erst expliziten Override pruefen, sonst
+        # Best-Effort-Recherche (mit ehrlichem 'verified'-Status statt
+        # stillschweigend eine evtl. falsche Adresse zu erfinden).
+        recipient_override = data.get("recipient") or {}
+        company_name = (job.get("company") or "").strip()
+        job_location = (job.get("location") or "").strip()
+        address_verified = False
+        if recipient_override.get("address"):
+            r_address = recipient_override["address"]
+            address_verified = True  # vom Nutzer explizit angegeben
+        else:
+            lookup = await _lookup_company_address(company_name, job_location)
+            if lookup["verified"]:
+                r_address = lookup["address"]
+                address_verified = True
+            else:
+                r_address = job_location  # ehrlicher Fallback: nur Ort, keine erfundene Strasse
+
         recipient = {
-            "company": (job.get("company") or "").strip(),
-            "attention": "",
-            "address": (job.get("location") or "").strip(),
+            "company": company_name,
+            "attention": recipient_override.get("attention") or "",
+            "address": r_address,
         }
         date_str = datetime.now().strftime("%d.%m.%Y")
 
@@ -2957,6 +3059,9 @@ async def jobqueen_coverletter_export(request: Request):
         fname_base = f"Anschreiben_{company_part}_{title_part}"
         caption = (f"✍️ Anschreiben: {job.get('title') or ''} bei {job.get('company') or ''}"
                    f"{(' · ' + job.get('location')) if job.get('location') else ''}")
+        if not address_verified and r_address:
+            caption += ("\n\n⚠️ Firmenadresse konnte nicht sicher verifiziert werden - "
+                        "es wurde nur der Ort verwendet. Bitte pruefen/ergaenzen.")
 
         if tg_chat_id:
             try:
@@ -2977,6 +3082,7 @@ async def jobqueen_coverletter_export(request: Request):
                 )
                 return JSONResponse({
                     "success": True, "telegram_sent": True, "method": "telegram",
+                    "address_verified": address_verified,
                     "message": "Anschreiben als Word & PDF in den Telegram-Chat gesendet.",
                 })
             except Exception as tg_err:
@@ -3173,13 +3279,23 @@ async def jobqueen_cv_stream(request: Request):
             )
             _cv_usr = (
                 "Analysiere diesen Lebenslauf und gib strukturiertes JSON zurueck.\n\n"
-                'Schema: {"name": null, "skills": [], "languages": [], '
+                'Schema: {"name": null, "address": null, "email": null, "phone": null, '
+                '"skills": [], "languages": [], '
                 '"experience_years": 0, "experience_months": 0, '
                 '"experience_details": {"total_months": 0, "roles": [{"title": "", "company": "", "start": null, "end": null, "months": 0}]}, '
                 '"strengths": [{"strength": "", "evidence": "", "relevance": ""}], '
                 '"suggested_job_titles": [{"title": "", "reason": ""}], '
                 '"missing_info_questions": []}\n\n'
-                "Regeln: mind. 8 strengths mit konkretem Beleg, mind. 8 suggested_job_titles.\n\n"
+                "Regeln:\n"
+                "- 'address': volle Anschrift (Strasse Hausnummer, PLZ Ort) exakt wie im Dokument, sonst null.\n"
+                "- 'email'/'phone': exakt wie im Dokument (z.B. aus dem Deckblatt/Bewerbungsanschreiben), sonst null.\n"
+                "- WICHTIG fuer 'experience_details.roles' und 'experience_years'/'experience_months': "
+                "erfasse WIRKLICH JEDE einzelne Berufsstation/Anstellung/Praktikum aus dem GESAMTEN "
+                "bereitgestellten Text von der aktuellsten bis zur AELTESTEN (auch wenn diese schon "
+                "viele Jahre zurueckliegt) - nicht nur die letzten 1-2 Stationen. Addiere die Monate "
+                "ALLER Stationen fuer 'experience_details.total_months' und 'experience_years'/"
+                "'experience_months'. Ueberspringe KEINE Station, auch keine kurzen Praktika.\n"
+                "- mind. 8 strengths mit konkretem Beleg, mind. 8 suggested_job_titles.\n\n"
                 f"Datei: {filename}\n\nEXTRAHIERTER TEXT:\n{extracted_text[:25000]}"
             )
 
@@ -3240,6 +3356,28 @@ async def jobqueen_cv_stream(request: Request):
 
     except Exception as e:
         logger.error("jobqueen_cv_stream Fehler: %s", e, exc_info=True)
+        return JSONResponse({"error": str(e)[:500]}, status_code=500)
+
+
+@app.post("/api/jobqueen/profile/links")
+async def jobqueen_profile_links(request: Request):
+    """Speichert Website/LinkedIn/Xing EINMALIG im Session-State, damit sie
+    automatisch in die Fusszeile jedes zukuenftigen Anschreibens (DOCX+PDF)
+    uebernommen werden, ohne sie jedes Mal neu eingeben zu muessen."""
+    try:
+        data = await request.json()
+        chat_id = (data.get("chat_id") or "jobqueen").strip() or "jobqueen"
+        from bot_state import jobqueen_state
+        state = jobqueen_state.setdefault(chat_id, {})
+        existing = state.get("sender_links") or {}
+        updated = dict(existing)
+        for k in ("website", "linkedin", "xing"):
+            if k in data:
+                updated[k] = (data.get(k) or "").strip()
+        state["sender_links"] = updated
+        return JSONResponse({"success": True, "sender_links": updated})
+    except Exception as e:
+        logger.error("jobqueen_profile_links Fehler: %s", e, exc_info=True)
         return JSONResponse({"error": str(e)[:500]}, status_code=500)
 
 
@@ -3335,6 +3473,9 @@ async def jobqueen_cv_analyze(request: Request):
                 "JSON-Schema:\n"
                 "{\n"
                 '  "name": string|null,\n'
+                '  "address": string|null,\n'
+                '  "email": string|null,\n'
+                '  "phone": string|null,\n'
                 '  "skills": string[],\n'
                 '  "languages": string[],\n'
                 '  "experience_years": number,\n'
@@ -3345,7 +3486,11 @@ async def jobqueen_cv_analyze(request: Request):
                 '  "missing_info_questions": string[]\n'
                 "}\n\n"
                 "Regeln:\n"
-                "- Berechne Berufserfahrung korrekt: mehrere Rollen beruecksichtigen, Start/End-Daten nutzen.\n"
+                "- 'address': volle Anschrift (Strasse Hausnummer, PLZ Ort) exakt wie im Dokument, sonst null.\n"
+                "- 'email'/'phone': exakt wie im Dokument (z.B. Deckblatt/Kopfzeile), sonst null.\n"
+                "- Berufserfahrung WICHTIG: erfasse WIRKLICH JEDE Berufsstation/Anstellung/Praktikum aus dem "
+                "GESAMTEN Text von der aktuellsten bis zur AELTESTEN, auch wenn diese Jahre zurueckliegt - "
+                "nicht nur die letzten 1-2 Stationen. Addiere ALLE Monate fuer experience_years/months.\n"
                 "- strengths: mindestens 8 Eintraege, je mit konkretem Beleg aus dem Lebenslauf und Relevanz.\n"
                 "- suggested_job_titles: mindestens 8 konkrete Jobtitel passend zu Skills + Erfahrung.\n"
                 "- missing_info_questions: max 6 Fragen nur wenn noetig.\n\n"

@@ -1463,6 +1463,45 @@ function renderProfile(profile){
 
   html += '</div>';
   el.innerHTML = html;
+  renderContactLinksForm();
+}
+
+function renderContactLinksForm(){
+  const container = document.getElementById('profile-content');
+  if (!container) return;
+  const existing = window._senderLinks || {};
+  const box = document.createElement('div');
+  box.style.cssText = 'background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:10px;';
+  box.innerHTML = `
+    <div style="font-weight:800;color:var(--accent);font-size:0.85rem;margin-bottom:8px;">🔗 Kontakt-Links (für Anschreiben-Fußzeile)</div>
+    <div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px;">Einmal hinterlegen – wird automatisch in jedes zukünftige Word/PDF-Anschreiben übernommen.</div>
+    <input id="link-website" type="text" placeholder="Website / Landingpage (z.B. www.deinname.de)" value="${escapeHtml(existing.website||'')}" style="width:100%;margin-bottom:6px;padding:6px 8px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--s2);color:var(--text);">
+    <input id="link-linkedin" type="text" placeholder="LinkedIn-Profil-URL" value="${escapeHtml(existing.linkedin||'')}" style="width:100%;margin-bottom:6px;padding:6px 8px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--s2);color:var(--text);">
+    <input id="link-xing" type="text" placeholder="Xing-Profil-URL" value="${escapeHtml(existing.xing||'')}" style="width:100%;margin-bottom:8px;padding:6px 8px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border);background:var(--s2);color:var(--text);">
+    <span class="job-cl-btn" onclick="saveContactLinks()">💾 Links speichern</span>
+    <span id="link-save-status" style="font-size:0.72rem;color:var(--muted);margin-left:8px;"></span>
+  `;
+  container.appendChild(box);
+}
+
+async function saveContactLinks(){
+  const website = document.getElementById('link-website')?.value.trim() || '';
+  const linkedin = document.getElementById('link-linkedin')?.value.trim() || '';
+  const xing = document.getElementById('link-xing')?.value.trim() || '';
+  const status = document.getElementById('link-save-status');
+  try {
+    const res = await fetch('/api/jobqueen/profile/links', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ chat_id: 'jobqueen', website, linkedin, xing })
+    });
+    const d = await res.json();
+    if (!res.ok || d.error) throw new Error(d.error || ('HTTP ' + res.status));
+    window._senderLinks = d.sender_links || {website, linkedin, xing};
+    if (status) { status.textContent = '✓ gespeichert'; status.style.color = '#4CAF50'; }
+  } catch (e) {
+    if (status) { status.textContent = '✗ Fehler beim Speichern'; status.style.color = '#e57373'; }
+  }
 }
 
 function analyzeCV(file) {

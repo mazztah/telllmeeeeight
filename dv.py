@@ -36,8 +36,8 @@ def get_mime(file_path: str) -> str:
 
 
 # ====================== LESEN ======================
-def _ocr_pdf_fallback(file_path: str, num_pages: int, max_pages: int = 6, dpi: int = 120,
-                       min_chars_early_exit: int = 3500, progress: dict = None) -> str:
+def _ocr_pdf_fallback(file_path: str, num_pages: int, max_pages: int = 10, dpi: int = 120,
+                       min_chars_early_exit: int = 11000, progress: dict = None) -> str:
     """OCR-Fallback fuer PDFs ohne (verwertbaren) Text-Layer, z.B. eingescannte
     Bewerbungsmappen. Bewusst limitiert (max_pages, niedrige DPI), damit das
     auch auf schwacher/gedrosselter Free-Tier-CPU in vertretbarer Zeit
@@ -780,7 +780,8 @@ def create_cv_excel(profile: dict) -> BytesIO:
 #   }
 #
 # `sender` (optional, alles darf leer/None sein):
-#   {"name": "...", "address": "...", "email": "...", "phone": "..."}
+#   {"name": "...", "address": "...", "email": "...", "phone": "...",
+#    "website": "https://...", "linkedin": "https://...", "xing": "https://..."}
 #
 # `recipient` (optional):
 #   {"company": "...", "attention": "...", "address": "..."}
@@ -791,12 +792,60 @@ def _cl_field(d: dict, key: str, default: str = "") -> str:
     return str(val).strip() if val else default
 
 
+def _cl_norm_url(url: str) -> str:
+    """Stellt sicher, dass ein Link ein gueltiges Schema hat (fuer klickbare
+    Hyperlinks in DOCX/PDF), ohne den Nutzer mit Details zu belasten."""
+    url = (url or "").strip()
+    if not url:
+        return ""
+    if not url.startswith(("http://", "https://", "mailto:", "tel:")):
+        url = "https://" + url
+    return url
+
+
+def _docx_add_hyperlink(paragraph, url: str, text: str, size_pt: float = 9.0):
+    """python-docx bietet keine eingebaute Hyperlink-API - dieser Helfer fuegt
+    einen echten klickbaren Link per OOXML-Relationship ein (Standard-Technik,
+    da python-docx selbst keine add_hyperlink()-Methode hat)."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    part = paragraph.part
+    r_id = part.relate_to(
+        url, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+        is_external=True,
+    )
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+
+    new_run = OxmlElement("w:r")
+    rpr = OxmlElement("w:rPr")
+
+    color = OxmlElement("w:color")
+    color.set(qn("w:val"), "1155CC")
+    rpr.append(color)
+    underline = OxmlElement("w:u")
+    underline.set(qn("w:val"), "single")
+    rpr.append(underline)
+    sz = OxmlElement("w:sz")
+    sz.set(qn("w:val"), str(int(size_pt * 2)))
+    rpr.append(sz)
+
+    new_run.append(rpr)
+    text_el = OxmlElement("w:t")
+    text_el.text = text
+    new_run.append(text_el)
+    hyperlink.append(new_run)
+    paragraph._p.append(hyperlink)
+
+
 def create_cover_letter_docx(letter: dict, sender: dict = None, recipient: dict = None,
                               date_str: str = "") -> BytesIO:
     """Erstellt ein professionell formatiertes Bewerbungsanschreiben als DOCX
-    (DIN-5008-angelehntes Layout: Absenderzeile, Datum rechtsbuendig, Betreff
-    fett, Anrede, Fliesstext-Absaetze, Grussformel)."""
-    from docx.shared import Pt, Cm
+    (DIN-5008-angelehntes Layout: Absenderzeile, Datum rechtsbuendig, grosse
+    Betreffzeile, Anrede, Fliesstext-Absaetze, Grussformel, klickbare
+    Kontakt-Fusszeile mit Telefon/E-Mail/Website/LinkedIn/Xing)."""
+    from docx.shared import Pt, Cm, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
 
     sender = sender or {}
@@ -806,7 +855,7 @@ def create_cover_letter_docx(letter: dict, sender: dict = None, recipient: dict 
 
     section = doc.sections[0]
     section.top_margin = Cm(2.5)
-    section.bottom_margin = Cm(2.0)
+    section.bottom_margin = Cm(2.2)
     section.left_margin = Cm(2.5)
     section.right_margin = Cm(2.0)
 
@@ -831,7 +880,7 @@ def create_cover_letter_docx(letter: dict, sender: dict = None, recipient: dict 
 
     date_p = doc.add_paragraph(date_str)
     date_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    date_p.paragraph_format.space_after = Pt(12)
+    date_p.paragraph_format.space_after = Pt(16)
 
     if r_company or r_att or r_addr:
         for line in filter(None, [r_company, r_att, r_addr]):
@@ -839,32 +888,84 @@ def create_cover_letter_docx(letter: dict, sender: dict = None, recipient: dict 
             p.paragraph_format.space_after = Pt(0)
         doc.add_paragraph().paragraph_format.space_after = Pt(0)
 
+    # Betreffzeile: deutlich groesser + fett (vom Nutzer gewuenscht), etwas
+    # mehr Luft davor/danach fuer bessere visuelle Trennung.
     subject = _cl_field(letter, "subject", "Bewerbung")
     subj_p = doc.add_paragraph()
+    subj_p.paragraph_format.space_before = Pt(6)
+    subj_p.paragraph_format.space_after = Pt(18)
     subj_run = subj_p.add_run(subject)
     subj_run.bold = True
-    subj_p.paragraph_format.space_after = Pt(14)
+    subj_run.font.size = Pt(14)
 
     salutation = _cl_field(letter, "salutation", "Sehr geehrte Damen und Herren,")
     sal_p = doc.add_paragraph(salutation)
-    sal_p.paragraph_format.space_after = Pt(10)
+    sal_p.paragraph_format.space_after = Pt(12)
 
     paragraphs = letter.get("paragraphs") or []
     if isinstance(paragraphs, str):
         paragraphs = [p.strip() for p in paragraphs.split("\n\n") if p.strip()]
     for para_text in paragraphs:
         p = doc.add_paragraph(para_text)
-        p.paragraph_format.space_after = Pt(10)
-        p.paragraph_format.line_spacing = 1.15
+        p.paragraph_format.space_after = Pt(12)
+        p.paragraph_format.line_spacing = 1.25
 
     closing = _cl_field(letter, "closing", "Mit freundlichen Gruessen")
     doc.add_paragraph().paragraph_format.space_after = Pt(0)
     close_p = doc.add_paragraph(closing)
-    close_p.paragraph_format.space_after = Pt(30)
+    close_p.paragraph_format.space_after = Pt(36)
 
     sig_name = _cl_field(letter, "signature_name", s_name)
     if sig_name:
         doc.add_paragraph(sig_name)
+
+    # ── Kontakt-Fusszeile: Telefon/E-Mail/Website/LinkedIn/Xing, klickbar ──
+    s_web = _cl_norm_url(_cl_field(sender, "website"))
+    s_linkedin = _cl_norm_url(_cl_field(sender, "linkedin"))
+    s_xing = _cl_norm_url(_cl_field(sender, "xing"))
+    if s_phone or s_mail or s_web or s_linkedin or s_xing:
+        footer = section.footer
+        footer.is_linked_to_previous = False
+        fp = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+        fp.text = ""
+        fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        fp.paragraph_format.space_before = Pt(4)
+
+        # duenne Trennlinie oberhalb der Fusszeile
+        from docx.oxml.ns import qn as _qn
+        from docx.oxml import OxmlElement as _Oxml
+        pPr = fp._p.get_or_add_pPr()
+        pBdr = _Oxml("w:pBdr")
+        top = _Oxml("w:top")
+        top.set(_qn("w:val"), "single")
+        top.set(_qn("w:sz"), "4")
+        top.set(_qn("w:space"), "6")
+        top.set(_qn("w:color"), "CCCCCC")
+        pBdr.append(top)
+        pPr.append(pBdr)
+
+        segments = []
+        if s_phone:
+            segments.append(("text", s_phone))
+        if s_mail:
+            segments.append(("link", f"mailto:{s_mail}", s_mail))
+        if s_web:
+            segments.append(("link", s_web, s_web.replace("https://", "").replace("http://", "")))
+        if s_linkedin:
+            segments.append(("link", s_linkedin, "LinkedIn"))
+        if s_xing:
+            segments.append(("link", s_xing, "Xing"))
+
+        for i, seg in enumerate(segments):
+            if i > 0:
+                sep_run = fp.add_run("   |   ")
+                sep_run.font.size = Pt(8.5)
+                sep_run.font.color.rgb = RGBColor(0x99, 0x99, 0x99)
+            if seg[0] == "text":
+                r = fp.add_run(seg[1])
+                r.font.size = Pt(8.5)
+            else:
+                _docx_add_hyperlink(fp, seg[1], seg[2], size_pt=8.5)
 
     buf = BytesIO()
     doc.save(buf)
@@ -876,21 +977,31 @@ def create_cover_letter_pdf(letter: dict, sender: dict = None, recipient: dict =
                              date_str: str = "") -> BytesIO:
     """Erstellt dasselbe Anschreiben als sauber umbrochenes PDF (reportlab
     Platypus statt Zeile-fuer-Zeile-Canvas -> echter Fliesstext-Umbruch,
-    saubere Seitenumbrueche bei laengeren Texten)."""
+    saubere Seitenumbrueche bei laengeren Texten), inkl. grosser Betreffzeile
+    und klickbarer Kontakt-Fusszeile."""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import cm
+    from reportlab.lib.colors import HexColor
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_RIGHT
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Frame, PageTemplate
     from xml.sax.saxutils import escape as _xml_escape
 
     sender = sender or {}
     recipient = recipient or {}
 
+    s_phone = _cl_field(sender, "phone")
+    s_mail = _cl_field(sender, "email")
+    s_web = _cl_norm_url(_cl_field(sender, "website"))
+    s_linkedin = _cl_norm_url(_cl_field(sender, "linkedin"))
+    s_xing = _cl_norm_url(_cl_field(sender, "xing"))
+    has_footer = bool(s_phone or s_mail or s_web or s_linkedin or s_xing)
+
     buf = BytesIO()
+    bottom_margin = 2.6 * cm if has_footer else 2.0 * cm
     docpdf = SimpleDocTemplate(
         buf, pagesize=A4,
-        topMargin=2.5 * cm, bottomMargin=2.0 * cm,
+        topMargin=2.5 * cm, bottomMargin=bottom_margin,
         leftMargin=2.5 * cm, rightMargin=2.0 * cm,
     )
 
@@ -898,12 +1009,16 @@ def create_cover_letter_pdf(letter: dict, sender: dict = None, recipient: dict =
     style_small = ParagraphStyle("clSmall", parent=base_styles["Normal"],
                                   fontName="Helvetica", fontSize=9.5, leading=13)
     style_normal = ParagraphStyle("clNormal", parent=base_styles["Normal"],
-                                   fontName="Helvetica", fontSize=11, leading=16,
-                                   spaceAfter=10)
+                                   fontName="Helvetica", fontSize=11, leading=17,
+                                   spaceAfter=12)
     style_right = ParagraphStyle("clRight", parent=style_normal, alignment=TA_RIGHT,
-                                  spaceAfter=14)
+                                  spaceAfter=16)
+    # Betreffzeile: deutlich groesser + fett (vom Nutzer gewuenscht)
     style_subject = ParagraphStyle("clSubject", parent=style_normal, fontName="Helvetica-Bold",
-                                    spaceAfter=14)
+                                    fontSize=14.5, leading=18, spaceBefore=6, spaceAfter=18)
+    style_footer = ParagraphStyle("clFooter", parent=base_styles["Normal"], fontName="Helvetica",
+                                   fontSize=8.5, leading=11, alignment=TA_CENTER,
+                                   textColor=HexColor("#555555"))
 
     story = []
 
@@ -912,12 +1027,10 @@ def create_cover_letter_pdf(letter: dict, sender: dict = None, recipient: dict =
 
     s_name = _cl_field(sender, "name")
     s_addr = _cl_field(sender, "address")
-    s_mail = _cl_field(sender, "email")
-    s_phone = _cl_field(sender, "phone")
     if s_name or s_addr or s_mail or s_phone:
         block = "<br/>".join(esc(x) for x in [s_name, s_addr, s_mail, s_phone] if x)
         story.append(Paragraph(block, style_small))
-        story.append(Spacer(1, 16))
+        story.append(Spacer(1, 18))
 
     story.append(Paragraph(esc(date_str), style_right))
 
@@ -927,7 +1040,7 @@ def create_cover_letter_pdf(letter: dict, sender: dict = None, recipient: dict =
     if r_company or r_att or r_addr:
         block = "<br/>".join(esc(x) for x in [r_company, r_att, r_addr] if x)
         story.append(Paragraph(block, style_normal))
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 12))
 
     subject = _cl_field(letter, "subject", "Bewerbung")
     story.append(Paragraph(esc(subject), style_subject))
@@ -942,13 +1055,43 @@ def create_cover_letter_pdf(letter: dict, sender: dict = None, recipient: dict =
         story.append(Paragraph(esc(para_text), style_normal))
 
     closing = _cl_field(letter, "closing", "Mit freundlichen Gruessen")
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 12))
     story.append(Paragraph(esc(closing), style_normal))
 
     sig_name = _cl_field(letter, "signature_name", s_name)
     if sig_name:
-        story.append(Spacer(1, 30))
+        story.append(Spacer(1, 36))
         story.append(Paragraph(esc(sig_name), style_normal))
+
+    if has_footer:
+        segs = []
+        if s_phone:
+            segs.append(esc(s_phone))
+        if s_mail:
+            segs.append(f'<link href="mailto:{esc(s_mail)}"><u>{esc(s_mail)}</u></link>')
+        if s_web:
+            web_label = esc(s_web.replace("https://", "").replace("http://", ""))
+            segs.append(f'<link href="{esc(s_web)}"><u>{web_label}</u></link>')
+        if s_linkedin:
+            segs.append(f'<link href="{esc(s_linkedin)}"><u>LinkedIn</u></link>')
+        if s_xing:
+            segs.append(f'<link href="{esc(s_xing)}"><u>Xing</u></link>')
+        footer_text = "   |   ".join(segs)
+
+        def _draw_footer(canvas, doc_):
+            canvas.saveState()
+            canvas.setStrokeColor(HexColor("#CCCCCC"))
+            canvas.setLineWidth(0.5)
+            line_y = bottom_margin - 0.5 * cm
+            canvas.line(2.5 * cm, line_y, A4[0] - 2.0 * cm, line_y)
+            p = Paragraph(footer_text, style_footer)
+            w, h = p.wrap(A4[0] - 4.5 * cm, bottom_margin)
+            p.drawOn(canvas, 2.5 * cm, line_y - h - 4)
+            canvas.restoreState()
+
+        frame = Frame(2.5 * cm, bottom_margin, A4[0] - 4.5 * cm, A4[1] - 2.5 * cm - bottom_margin,
+                       id="normal")
+        docpdf.addPageTemplates([PageTemplate(id="withFooter", frames=[frame], onPage=_draw_footer)])
 
     docpdf.build(story)
     buf.seek(0)
