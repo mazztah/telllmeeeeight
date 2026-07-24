@@ -301,7 +301,7 @@ async def generate_response(chat_id: str, message: str) -> str:
     model_list = [
         "groq/compound",
         "qwen/qwen3.6-27b",
-        "llama3-70b-8192",
+        "openai/gpt-oss-20b",
         "codex/gpt-5.2",
     ]
 
@@ -340,6 +340,12 @@ async def generate_structured_json(system_prompt: str, user_message: str, max_to
     """Direkte LLM-Anfrage ohne Chat-History und ohne Sandy-Persona.
     Optimal für strukturierte JSON-Ausgaben (CV-Analyse, Job-Listings, etc.).
     Verwendet niedrige Temperature für konsistentes JSON.
+
+    Wirft eine RuntimeError mit Details zu ALLEN fehlgeschlagenen Modellen,
+    falls kein einziges Modell eine Antwort liefert - vorher wurde in diesem
+    Fall stillschweigend "" zurueckgegeben, wodurch der EIGENTLICHE Grund
+    (z.B. ungueltiger Modellname, 401/API-Key, 429 Rate-Limit) im Log
+    verschwand und beim Nutzer nur "leere Antwort" ankam, ohne Diagnose-Wert.
     """
     messages = [
         {"role": "system", "content": system_prompt},
@@ -349,7 +355,7 @@ async def generate_structured_json(system_prompt: str, user_message: str, max_to
     model_list = [
         "groq/compound",
         "qwen/qwen3.6-27b",
-        "llama3-70b-8192",
+        "openai/gpt-oss-20b",
     ]
 
     # NEU: Vorher wurde bei JEDEM Fehler ausser einer kleinen Keyword-Liste
@@ -360,6 +366,7 @@ async def generate_structured_json(system_prompt: str, user_message: str, max_to
     # Fehler die naechsten Modelle probieren, erst nach Erschoepfen aller
     # Modelle aufgeben. Zusaetzlich Timeout pro Versuch, damit ein
     # haengender Call nicht die ganze Anfrage blockiert.
+    failures = []
     for index, model_name in enumerate(model_list):
         try:
             completion = await asyncio.wait_for(
@@ -389,6 +396,7 @@ async def generate_structured_json(system_prompt: str, user_message: str, max_to
                 )
             if not reply:
                 logger.warning("generate_structured_json Modell %s lieferte leere Antwort", model_name)
+                failures.append(f"{model_name}: leere Antwort (finish_reason={finish_reason})")
                 continue
             if index > 0:
                 logger.info("✅ generate_structured_json Fallback auf %s", model_name)
@@ -396,10 +404,12 @@ async def generate_structured_json(system_prompt: str, user_message: str, max_to
 
         except Exception as exc:
             logger.warning("generate_structured_json Modell %s fehlgeschlagen: %s", model_name, exc)
+            failures.append(f"{model_name}: {type(exc).__name__}: {str(exc)[:150]}")
             continue
 
-    logger.error("generate_structured_json: Alle Modelle fehlgeschlagen")
-    return ""
+    detail = " | ".join(failures) if failures else "unbekannt"
+    logger.error("generate_structured_json: Alle Modelle fehlgeschlagen - %s", detail)
+    raise RuntimeError(f"Alle KI-Modelle fehlgeschlagen: {detail}")
 
 
 async def generate_structured_json_stream(system_prompt: str, user_message: str, max_tokens: int = 4096):
@@ -414,10 +424,11 @@ async def generate_structured_json_stream(system_prompt: str, user_message: str,
     model_list = [
         "groq/compound",
         "qwen/qwen3.6-27b",
-        "llama3-70b-8192",
+        "openai/gpt-oss-20b",
     ]
     full_reply = ""
     success = False
+    failures = []
 
     for index, model_name in enumerate(model_list):
         # NEU: full_reply bei jedem neuen Modellversuch zuruecksetzen. Vorher
@@ -467,6 +478,7 @@ async def generate_structured_json_stream(system_prompt: str, user_message: str,
 
             if not full_reply.strip():
                 logger.warning("generate_structured_json_stream Modell %s lieferte leeren Stream", model_name)
+                failures.append(f"{model_name}: leerer Stream (finish_reason={finish_reason})")
                 continue
 
             if index > 0:
@@ -476,10 +488,18 @@ async def generate_structured_json_stream(system_prompt: str, user_message: str,
 
         except Exception as exc:
             logger.warning("generate_structured_json_stream Modell %s: %s", model_name, exc)
+            failures.append(f"{model_name}: {type(exc).__name__}: {str(exc)[:150]}")
             continue
 
     if not success:
-        logger.error("generate_structured_json_stream: Alle Modelle fehlgeschlagen")
+        detail = " | ".join(failures) if failures else "unbekannt"
+        logger.error("generate_structured_json_stream: Alle Modelle fehlgeschlagen - %s", detail)
+        # NEU: Detail-Grund als eigenes Tag mitsenden, statt ihn nur ins Log zu
+        # schreiben - der Aufrufer (main.py) kann ihn dann in die Nutzer-Fehler-
+        # meldung uebernehmen, um die tatsaechliche Ursache sichtbar zu machen
+        # (z.B. ungueltiger Modellname, 401/API-Key, 429 Rate-Limit) statt nur
+        # "leere Antwort" ohne Diagnosewert.
+        yield ("error_detail", detail)
     yield ("done", full_reply)
 
 
@@ -491,7 +511,7 @@ async def generate_response_stream(chat_id: str, message: str):
     model_list = [
         "groq/compound",
         "qwen/qwen3.6-27b",
-        "llama3-70b-8192",
+        "openai/gpt-oss-20b",
         "codex/gpt-5.2",
     ]
 

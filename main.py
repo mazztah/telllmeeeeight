@@ -2986,7 +2986,7 @@ async def jobqueen_coverletter_draft(request: Request):
         # Verbesserung deckt der extrahierte Text nun die komplette
         # Berufshistorie ab, nicht nur die ersten 1-2 Stationen.
         cv_block = (
-            f"AUSZUG AUS DEN HOCHGELADENEN BEWERBUNGSUNTERLAGEN (Lebenslauf, Originaltext):\n{cv_raw_text[:10000]}\n\n"
+            f"AUSZUG AUS DEN HOCHGELADENEN BEWERBUNGSUNTERLAGEN (Lebenslauf, Originaltext):\n{cv_raw_text[:6000]}\n\n"
             if cv_raw_text else
             "Es wurden KEINE Bewerbungsunterlagen (Lebenslauf) hochgeladen. Schreibe ein "
             "ueberzeugendes, aber bewusst allgemeiner gehaltenes Anschreiben basierend nur auf "
@@ -3021,7 +3021,7 @@ async def jobqueen_coverletter_draft(request: Request):
             "- Keine erfundenen Fakten - nur verwenden, was im Profil/CV-Text tatsaechlich steht."
         )
 
-        reply = await generate_structured_json(_cl_system, _cl_user, max_tokens=2500)
+        reply = await generate_structured_json(_cl_system, _cl_user, max_tokens=2000)
         letter, _letter_parse_reason = _repair_and_parse_json(reply)
         letter = letter or {}
 
@@ -3419,13 +3419,13 @@ async def jobqueen_cv_stream(request: Request):
                 "ALLER Stationen fuer 'experience_details.total_months' und 'experience_years'/"
                 "'experience_months'. Ueberspringe KEINE Station, auch keine kurzen Praktika.\n"
                 "- mind. 8 strengths mit konkretem Beleg, mind. 8 suggested_job_titles.\n\n"
-                f"Datei: {filename}\n\nEXTRAHIERTER TEXT:\n{extracted_text[:25000]}"
+                f"Datei: {filename}\n\nEXTRAHIERTER TEXT:\n{extracted_text[:12000]}"
             )
 
             full_reply = ""
             error_detail = ""
             try:
-                async for tag, chunk in generate_structured_json_stream(_cv_sys, _cv_usr, max_tokens=6000):
+                async for tag, chunk in generate_structured_json_stream(_cv_sys, _cv_usr, max_tokens=3000):
                     if tag == "text":
                         full_reply += chunk
                         yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
@@ -3626,11 +3626,11 @@ async def jobqueen_cv_analyze(request: Request):
                 "- strengths: mindestens 8 Eintraege, je mit konkretem Beleg aus dem Lebenslauf und Relevanz.\n"
                 "- suggested_job_titles: mindestens 8 konkrete Jobtitel passend zu Skills + Erfahrung.\n"
                 "- missing_info_questions: max 6 Fragen nur wenn noetig.\n\n"
-                f"Lebenslauf Datei: {filename}\n\nEXTRAHIERTER TEXT:\n{extracted_text[:25000]}"
+                f"Lebenslauf Datei: {filename}\n\nEXTRAHIERTER TEXT:\n{extracted_text[:12000]}"
             )
 
             try:
-                reply = await generate_structured_json(_cv_system, _cv_user, max_tokens=6000)
+                reply = await generate_structured_json(_cv_system, _cv_user, max_tokens=3000)
             except Exception as _llm_exc:
                 # NEU: generate_structured_json wirft jetzt eine detaillierte
                 # RuntimeError statt "" zurueckzugeben, wenn ALLE Modelle
